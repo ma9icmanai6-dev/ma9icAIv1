@@ -1,16 +1,21 @@
 {
-  "name": "react-example",
+  "name": "magic-ai-assistant",
+  "version": "1.0.0",
+  "description": "Magic AI Desktop Assistant for Windows 11",
+  "author": "ma9ic",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+
   "scripts": {
     "dev": "tsx server.ts",
     "postinstall": "npm run build",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "desktop:dev": "npm run build && electron .",
-    "desktop:build": "npm run build && electron-builder --win",
+    "desktop:package": "npm run build && npx @electron/packager . \"Magic-AI-Assistant\" --platform=win32 --arch=x64 --out=dist-app --overwrite",
+    "desktop:build": "npm run desktop:package",
     "preview": "vite preview",
+
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
@@ -45,6 +50,34 @@
   ,"build": {
     "appId": "com.magicai.assistant",
     "productName": "Magic AI Assistant",
-    "files": ["dist/**/*", "electron/**/*", "package.json"]
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Magic AI Assistant"
+    }
   }
 }
+

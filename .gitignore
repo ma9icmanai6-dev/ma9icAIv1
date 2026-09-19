@@ -7,4 +7,7 @@ coverage/
 .env*
 !.env.example
 public/models/nova.compressed.glb
+dist-app/
+release/
+
 
