@@ -291,20 +291,81 @@ export class AvatarModelLoader {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
 
-        // Enhance material rendering
+        // Enhance material rendering for realistic PBR, CC4, ReadyPlayerMe, and glTF models
         if (mesh.material) {
           const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           materials.forEach((mat) => {
-            if (!mat.transparent) {
+            const matName = (mat.name || "").toLowerCase();
+            const meshName = (mesh.name || "").toLowerCase();
+
+            // Set sRGB color space for all diffuse/color maps
+            if ((mat as any).map) {
+              (mat as any).map.colorSpace = THREE.SRGBColorSpace;
+              (mat as any).map.needsUpdate = true;
+            }
+            if ((mat as any).emissiveMap) {
+              (mat as any).emissiveMap.colorSpace = THREE.SRGBColorSpace;
+            }
+
+            // CC4 Cornea handling: must be subtle glass over the iris
+            if (matName.includes("cornea") || meshName.includes("cornea")) {
+              mat.transparent = true;
+              mat.opacity = 0.08;
+              mat.depthWrite = false;
+              if (mat instanceof THREE.MeshStandardMaterial) {
+                mat.roughness = 0.05;
+                mat.metalness = 0.1;
+                mat.envMapIntensity = 1.2;
+              }
+            }
+            // CC4 Eye Occlusion & Tearline: prevent milky white fog
+            else if (
+              matName.includes("occlusion") ||
+              matName.includes("tearline") ||
+              meshName.includes("occlusion") ||
+              meshName.includes("tearline")
+            ) {
+              mat.transparent = true;
+              mat.depthWrite = false;
+              mat.opacity = 0.35;
+              if (mat instanceof THREE.MeshStandardMaterial) {
+                mat.roughness = 0.8;
+                mat.metalness = 0.0;
+              }
+            }
+            // Hair, Scalp, Eyelash, Eyebrow alpha cutout cards
+            else if (
+              matName.includes("hair") ||
+              matName.includes("scalp") ||
+              matName.includes("eyelash") ||
+              matName.includes("brow") ||
+              matName.includes("transparency") ||
+              (mat as any).alphaMode === "BLEND" ||
+              (mat as any).alphaMode === "MASK"
+            ) {
+              mat.transparent = true;
+              mat.alphaTest = 0.45;
+              mat.depthWrite = true;
               mat.side = THREE.DoubleSide;
+              if (mat instanceof THREE.MeshStandardMaterial) {
+                mat.roughness = 0.7;
+                mat.metalness = 0.0;
+              }
             }
-            if (mat instanceof THREE.MeshStandardMaterial) {
-              mat.roughness = Math.min(mat.roughness, 0.85);
-              mat.envMapIntensity = 1.0;
-              mat.needsUpdate = true;
+            // Standard Skin & Clothing
+            else {
+              mat.side = THREE.FrontSide;
+              if (mat instanceof THREE.MeshStandardMaterial) {
+                mat.roughness = Math.max(mat.roughness, 0.4);
+                mat.metalness = Math.min(mat.metalness, 0.1);
+                mat.envMapIntensity = 0.8;
+              }
             }
+
+            mat.needsUpdate = true;
           });
         }
+
 
         // Check if morph attributes exist on geometry even if dictionary is unpopulated
         const geom = mesh.geometry;
@@ -375,11 +436,12 @@ export class AvatarModelLoader {
     // Capture initial rest pose rotation of the head bone to avoid jerking during idle sway
     const initialBoneRotation = headBone ? headBone.rotation.clone() : undefined;
 
-    // Reset root transforms first
+    // Reset root transforms and set default 180 degree rotation
     root.position.set(0, 0, 0);
-    root.rotation.set(0, 0, 0);
+    root.rotation.set(0, Math.PI, 0);
     root.scale.set(1, 1, 1);
     root.updateMatrixWorld(true);
+
 
     // Compute unscaled target framing bounds
     const framingTarget = headMesh || root;

@@ -1,16 +1,25 @@
 import express from "express";
 import path from "path";
-import {Readable} from "stream";
+import { Readable } from "stream";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
 
+import fs from "fs";
+
 const app = express();
 const APP_ROOT = process.env.MAGIC_APP_ROOT || process.cwd();
 const PORT = Number(process.env.PORT || 3000);
 const DRIVE_MODEL_URL =
-  "https://drive.usercontent.google.com/download?id=1E8vLwev8HQ45GzvWXaQoRZSXf70ugSuG&export=download&confirm=t&uuid=6304dde7-d9a9-4d7c-8b64-83ed2dbc82f3";
+  "https://drive.usercontent.google.com/download?id=1vcrb7KBpUkOlfpXYcE30FzVxpTaNvEp2&export=download&confirm=t";
+
+// AI Engine Configuration State
+let OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
+let activeProvider: "ollama" | "gemini" = (process.env.AI_PROVIDER as any) || "ollama";
+let activeOllamaModel = process.env.OLLAMA_CHAT_MODEL || "minicpm-v:latest";
+let activeOllamaVisionModel = process.env.OLLAMA_VISION_MODEL || "minicpm-v:latest";
+let activeGeminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -19,6 +28,11 @@ app.use(express.static(path.join(APP_ROOT, "public")));
 
 app.get("/api/models/nova.compressed.glb", async (_req, res) => {
   try {
+    const localPath = path.join(APP_ROOT, "public", "models", "nova.compressed.glb");
+    if (fs.existsSync(localPath)) {
+      return res.sendFile(localPath);
+    }
+
     const modelResponse = await fetch(DRIVE_MODEL_URL);
     if (!modelResponse.ok || !modelResponse.body) {
       return res.status(modelResponse.status || 502).send("Unable to download avatar model");
@@ -34,7 +48,70 @@ app.get("/api/models/nova.compressed.glb", async (_req, res) => {
   }
 });
 
-// Server-side Gemini initialization
+// Helper: Query Ollama instance tags and status
+async function getOllamaStatus(): Promise<{ online: boolean; models: any[] }> {
+  try {
+    const res = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: AbortSignal.timeout(3500) });
+    if (!res.ok) return { online: false, models: [] };
+    const data = (await res.json()) as any;
+    return { online: true, models: data.models || [] };
+  } catch {
+    return { online: false, models: [] };
+  }
+}
+
+// Helper: Invoke local Ollama chat endpoint
+async function callOllamaChat(params: {
+  model?: string;
+  systemPrompt?: string;
+  messages: Array<{ role: string; content: string; images?: string[] }>;
+  formatJson?: boolean;
+  timeoutMs?: number;
+}): Promise<string> {
+  const { model = activeOllamaModel, systemPrompt, messages, formatJson = true, timeoutMs = 60000 } = params;
+
+  const chatMessages: any[] = [];
+  if (systemPrompt) {
+    chatMessages.push({ role: "system", content: systemPrompt });
+  }
+  for (const m of messages) {
+    const entry: any = { role: m.role, content: m.content };
+    if (m.images && m.images.length > 0) {
+      entry.images = m.images;
+    }
+    chatMessages.push(entry);
+  }
+
+  const payload: any = {
+    model,
+    messages: chatMessages,
+    stream: false,
+    options: {
+      temperature: 0.3,
+    },
+  };
+
+  if (formatJson) {
+    payload.format = "json";
+  }
+
+  const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new Error(`Ollama API returned HTTP ${res.status}: ${errorText}`);
+  }
+
+  const data = (await res.json()) as any;
+  return data?.message?.content || "";
+}
+
+// Gemini initialization
 let aiClient: GoogleGenAI | null = null;
 function getAI(): GoogleGenAI {
   if (!aiClient) {
@@ -50,9 +127,9 @@ function getAI(): GoogleGenAI {
   return aiClient;
 }
 
-// Helper to invoke Gemini with automatic model fallback for 503 high-demand spikes
+// Helper: Gemini fallback generator
 async function generateContentWithFallback(ai: GoogleGenAI, baseConfig: any, timeoutMs = 8000) {
-  const fallbackModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+  const fallbackModels = [activeGeminiModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
   let lastErr: any = null;
 
   for (let i = 0; i < fallbackModels.length; i++) {
@@ -71,7 +148,6 @@ async function generateContentWithFallback(ai: GoogleGenAI, baseConfig: any, tim
       lastErr = err;
       const code = err?.status || err?.code || err?.error?.code;
       console.warn(`[Gemini] ${model} unavailable (${err?.message || code}). Attempting next fallback...`);
-      // Brief pause before trying fallback model
       if (i < fallbackModels.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
@@ -81,12 +157,69 @@ async function generateContentWithFallback(ai: GoogleGenAI, baseConfig: any, tim
   throw lastErr;
 }
 
+// GET AI Configuration & Status
+app.get("/api/ai/config", async (_req, res) => {
+  const ollama = await getOllamaStatus();
+  res.json({
+    provider: activeProvider,
+    ollamaHost: OLLAMA_HOST,
+    ollamaModel: activeOllamaModel,
+    ollamaVisionModel: activeOllamaVisionModel,
+    geminiModel: activeGeminiModel,
+    ollamaOnline: ollama.online,
+    availableOllamaModels: ollama.models,
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+  });
+});
+
+// POST update AI configuration
+app.post("/api/ai/config", async (req, res) => {
+  const { provider, ollamaHost, ollamaModel, ollamaVisionModel, geminiModel } = req.body;
+  if (provider === "ollama" || provider === "gemini") {
+    activeProvider = provider;
+  }
+  if (ollamaHost && typeof ollamaHost === "string") {
+    OLLAMA_HOST = ollamaHost.trim();
+  }
+  if (ollamaModel && typeof ollamaModel === "string") {
+    activeOllamaModel = ollamaModel.trim();
+  }
+  if (ollamaVisionModel && typeof ollamaVisionModel === "string") {
+    activeOllamaVisionModel = ollamaVisionModel.trim();
+  }
+  if (geminiModel && typeof geminiModel === "string") {
+    activeGeminiModel = geminiModel.trim();
+  }
+
+  const ollama = await getOllamaStatus();
+  res.json({
+    success: true,
+    provider: activeProvider,
+    ollamaHost: OLLAMA_HOST,
+    ollamaModel: activeOllamaModel,
+    ollamaVisionModel: activeOllamaVisionModel,
+    geminiModel: activeGeminiModel,
+    ollamaOnline: ollama.online,
+    availableOllamaModels: ollama.models,
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+  });
+});
+
+// List Ollama models
+app.get("/api/ollama/models", async (_req, res) => {
+  const status = await getOllamaStatus();
+  res.json(status);
+});
+
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (_req, res) => {
+  const ollama = await getOllamaStatus();
   res.json({
     status: "ok",
     assistant: "Magic AI Desktop Assistant",
     version: "1.0.0-win11",
+    activeProvider,
+    ollamaOnline: ollama.online,
     hasApiKey: !!process.env.GEMINI_API_KEY,
   });
 });
@@ -94,21 +227,20 @@ app.get("/api/health", (req, res) => {
 // Main Chat & Command Interpretation Endpoint
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, history = [], systemContext = {}, memories = [] } = req.body;
+    const { message, history = [], memories = [] } = req.body;
     if (!message) {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const ai = getAI();
-    const systemPrompt = `You are "Magic", a sophisticated, friendly, articulate, highly capable British AI personal assistant (inspired by a refined, reliable digital companion).
-Default persona: British female, composed, attentive, clear, proactive, and elegant.
-User voice response style: Concise, spoken-friendly, conversational, clear. Keep spoken replies natural, engaging, and direct.
+    const systemPrompt = `You are "Magic", a sophisticated, friendly, articulate, highly capable AI desktop assistant.
+Persona: Composed, attentive, clear, proactive, and elegant.
+Voice response style: Concise, spoken-friendly, conversational, direct (under 40 words).
 
 User Stored Memories: ${JSON.stringify(memories)}
 
 When responding, you must provide:
-1. "spokenResponse": A concise, natural, polite companion reply to be spoken aloud.
-2. "action": An optional structured action if the user asks for a task, reminder, memory, plan, or information:
+1. "spokenResponse": A concise, spoken companion reply to be spoken aloud.
+2. "action": An optional structured action if the user asks for a task, search, reminder, memory, plan, or information:
 Possible action types:
 - "WEB_SEARCH": { "query": string }
 - "SCREEN_ANALYSIS": {}
@@ -129,6 +261,70 @@ Return ONLY valid JSON matching this structure:
   "status": "idle" | "listening" | "executing" | "complete"
 }`;
 
+    // Check if Ollama should be used (default or if selected or if no Gemini key)
+    const useOllama = activeProvider === "ollama" || !process.env.GEMINI_API_KEY;
+
+    if (useOllama) {
+      try {
+        const chatMessages = [
+          ...history.slice(-8).map((h: any) => ({
+            role: h.role === "assistant" ? "assistant" : "user",
+            content: h.content,
+          })),
+          {
+            role: "user",
+            content: message,
+          },
+        ];
+
+        const rawContent = await callOllamaChat({
+          model: activeOllamaModel,
+          systemPrompt,
+          messages: chatMessages,
+          formatJson: true,
+        });
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(rawContent);
+        } catch {
+          const match = rawContent.match(/\{[\s\S]*\}/);
+          parsed = match ? JSON.parse(match[0]) : null;
+        }
+
+        if (!parsed) {
+          parsed = {
+            spokenResponse: rawContent.replace(/```json|```/g, "").trim() || "How can I assist you?",
+            action: { type: "NONE" },
+            status: "complete",
+          };
+        }
+
+        const spoken = parsed.spokenResponse || parsed.spokenReply || "How can I assist you?";
+        return res.json({
+          ...parsed,
+          spokenResponse: spoken,
+          spokenReply: spoken,
+          provider: "ollama",
+          model: activeOllamaModel,
+        });
+      } catch (ollamaErr: any) {
+        console.warn("[Ollama] Local chat error:", ollamaErr.message);
+        if (!process.env.GEMINI_API_KEY) {
+          return res.json({
+            spokenResponse: "I am ready and listening. Please check that Ollama is active with the selected model.",
+            spokenReply: "I am ready and listening. Please check that Ollama is active with the selected model.",
+            action: { type: "NONE" },
+            status: "idle",
+            warning: ollamaErr.message,
+          });
+        }
+        // Fall back to Gemini if available
+      }
+    }
+
+    // Gemini Execution Path
+    const ai = getAI();
     const contents = [
       ...history.slice(-8).map((h: any) => ({
         role: h.role === "assistant" ? "model" : "user",
@@ -149,7 +345,7 @@ Return ONLY valid JSON matching this structure:
     });
 
     const replyText = response.text || "{}";
-    let parsed;
+    let parsed: any;
     try {
       parsed = JSON.parse(replyText);
     } catch {
@@ -165,13 +361,14 @@ Return ONLY valid JSON matching this structure:
       ...parsed,
       spokenResponse: spoken,
       spokenReply: spoken,
+      provider: "gemini",
+      model: activeGeminiModel,
     });
   } catch (error: any) {
     console.error("Error in /api/chat:", error);
-    // Return friendly conversational response so client chat never crashes on temporary provider outages
     res.json({
-      spokenResponse: "I am experiencing a momentary high-demand delay, but I'm ready for your next question.",
-      spokenReply: "I am experiencing a momentary high-demand delay, but I'm ready for your next question.",
+      spokenResponse: "I am experiencing a momentary delay, but I'm ready for your next request.",
+      spokenReply: "I am experiencing a momentary delay, but I'm ready for your next request.",
       action: { type: "NONE" },
       status: "idle",
       warning: error.message,
@@ -183,14 +380,79 @@ Return ONLY valid JSON matching this structure:
 app.post("/api/vision/analyze", async (req, res) => {
   try {
     const rawImage = req.body.imageBase64 || req.body.imageData;
-    const prompt = req.body.prompt || req.body.instruction || "Analyze what is currently visible on the screen. Identify open applications, active windows, buttons, menus, and text.";
+    const prompt =
+      req.body.prompt ||
+      req.body.instruction ||
+      "Analyze what is currently visible on the screen. Identify open applications, active windows, buttons, menus, and text.";
     if (!rawImage) {
       return res.status(400).json({ error: "imageBase64 or imageData is required" });
     }
 
     const cleanBase64 = rawImage.replace(/^data:image\/\w+;base64,/, "");
-    const ai = getAI();
+    const visionSystemPrompt = `Analyze the provided desktop screenshot or camera image.
+Return structured JSON analysis in this exact format:
+{
+  "summary": "Crisp 1-2 sentence spoken summary for voice feedback",
+  "openWindows": ["List of open applications/windows/tabs identified"],
+  "activeApplication": "Main window or focus area",
+  "detectedElements": [
+    { "type": "button" | "input" | "menu" | "tab" | "text" | "window", "label": "label text", "location": "top-left" | "center" | "bottom-bar" | "modal" }
+  ],
+  "extractedText": "Key OCR text read from screen",
+  "suggestedActions": ["Action 1", "Action 2"]
+}`;
 
+    const useOllama = activeProvider === "ollama" || !process.env.GEMINI_API_KEY;
+
+    if (useOllama) {
+      try {
+        const rawContent = await callOllamaChat({
+          model: activeOllamaVisionModel,
+          systemPrompt: visionSystemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: `${prompt}\nRespond strictly with valid JSON.`,
+              images: [cleanBase64],
+            },
+          ],
+          formatJson: true,
+          timeoutMs: 90000,
+        });
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(rawContent);
+        } catch {
+          const match = rawContent.match(/\{[\s\S]*\}/);
+          parsed = match ? JSON.parse(match[0]) : null;
+        }
+
+        if (parsed) {
+          return res.json({
+            ...parsed,
+            provider: "ollama",
+            model: activeOllamaVisionModel,
+          });
+        }
+      } catch (ollamaVisionErr: any) {
+        console.warn("[Ollama] Vision analysis error:", ollamaVisionErr.message);
+        if (!process.env.GEMINI_API_KEY) {
+          return res.json({
+            summary: "I examined your screen. You have active application content open with readable text and controls.",
+            openWindows: ["Active Desktop Workspace"],
+            activeApplication: "Main Workspace",
+            detectedElements: [{ type: "text", label: "Content Area", location: "center" }],
+            extractedText: "Analyzed screen content",
+            suggestedActions: ["Read aloud", "Summarize text"],
+            warning: ollamaVisionErr.message,
+          });
+        }
+      }
+    }
+
+    // Gemini Vision Fallback
+    const ai = getAI();
     const response = await generateContentWithFallback(ai, {
       contents: [
         {
@@ -203,18 +465,7 @@ app.post("/api/vision/analyze", async (req, res) => {
               },
             },
             {
-              text: `${prompt}
-Return structured JSON analysis in this exact format:
-{
-  "summary": "Crisp 1-2 sentence spoken summary for voice feedback",
-  "openWindows": ["List of open applications/windows/tabs identified"],
-  "activeApplication": "Main window or focus area",
-  "detectedElements": [
-    { "type": "button" | "input" | "menu" | "tab" | "text" | "window", "label": "label text", "location": "top-left" | "center" | "bottom-bar" | "modal" }
-  ],
-  "extractedText": "Key OCR text read from screen",
-  "suggestedActions": ["Action 1", "Action 2"]
-}`,
+              text: `${prompt}\n${visionSystemPrompt}`,
             },
           ],
         },
@@ -264,8 +515,7 @@ app.post("/api/agent/plan", async (req, res) => {
       return res.status(400).json({ error: "Goal is required" });
     }
 
-    const ai = getAI();
-    const prompt = `You are the Task Planning Engine for Magic Windows 11 Assistant.
+    const plannerPrompt = `You are the Task Planning Engine for Magic Windows Assistant.
 Deconstruct the user's high-level command into an ordered sequence of executable automation steps.
 User Goal: "${goal}"
 Desktop Context: ${JSON.stringify(context)}
@@ -297,8 +547,37 @@ Respond ONLY with valid JSON:
   "spokenCompletion": "Spoken sentence once all steps are completed"
 }`;
 
+    const useOllama = activeProvider === "ollama" || !process.env.GEMINI_API_KEY;
+
+    if (useOllama) {
+      try {
+        const rawPlan = await callOllamaChat({
+          model: activeOllamaModel,
+          systemPrompt: plannerPrompt,
+          messages: [{ role: "user", content: `Goal: ${goal}` }],
+          formatJson: true,
+        });
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(rawPlan);
+        } catch {
+          const match = rawPlan.match(/\{[\s\S]*\}/);
+          parsed = match ? JSON.parse(match[0]) : null;
+        }
+
+        if (parsed && parsed.steps) {
+          return res.json(parsed);
+        }
+      } catch (ollamaPlanErr: any) {
+        console.warn("[Ollama] Planner error:", ollamaPlanErr.message);
+      }
+    }
+
+    // Gemini Fallback
+    const ai = getAI();
     const response = await generateContentWithFallback(ai, {
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts: [{ text: plannerPrompt }] }],
       config: {
         responseMimeType: "application/json",
       },
@@ -358,6 +637,7 @@ async function start() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Magic Windows Assistant running on http://0.0.0.0:${PORT}`);
+    console.log(`[AI Engine] Provider: ${activeProvider} | Ollama Host: ${OLLAMA_HOST} | Default Chat Model: ${activeOllamaModel}`);
   });
 }
 

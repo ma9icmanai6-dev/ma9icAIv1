@@ -111,3 +111,29 @@ export interface VoiceSettings {
   continuousListening: boolean;
   localWakeWordEnabled: boolean;
 }
+
+export type AIProviderType = "ollama" | "gemini";
+
+export interface OllamaModelInfo {
+  name: string;
+  size: number;
+  modified_at?: string;
+  details?: {
+    format?: string;
+    family?: string;
+    parameter_size?: string;
+    quantization_level?: string;
+  };
+}
+
+export interface AIConfig {
+  provider: AIProviderType;
+  ollamaHost: string;
+  ollamaModel: string;
+  ollamaVisionModel: string;
+  geminiModel: string;
+  ollamaOnline: boolean;
+  availableOllamaModels: OllamaModelInfo[];
+  hasGeminiKey: boolean;
+}
+

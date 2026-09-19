@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   AvatarModelLoader,
   LoadedAvatar,
   resolveMorphWeight,
 } from "../../services/avatarModelLoader";
 import { LipSyncEngine, VisemeWeights } from "../../services/lipSyncEngine";
+
 import {
   Upload,
   RefreshCw,
@@ -141,14 +143,11 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
         targetScene.remove(avatarRef.current.root);
       }
 
-      if (url === STARTUP_MODEL_URL) {
-        loadedAvatar.root.rotation.y = Math.PI;
-      }
       targetScene.add(loadedAvatar.root);
       avatarRef.current = loadedAvatar;
 
       if (cameraRef.current && controlsRef.current) {
-        cameraRef.current.position.set(0, 0, 4.0);
+        cameraRef.current.position.set(0, 0, 2.8);
         controlsRef.current.target.set(0, 0, 0);
         controlsRef.current.update();
       }
@@ -191,7 +190,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
       // Adjust camera and orbit controls to frame the avatar
       if (cameraRef.current && controlsRef.current) {
-        cameraRef.current.position.set(0, 0, 2.5);
+        cameraRef.current.position.set(0, 0, 2.8);
         controlsRef.current.target.set(0, 0, 0);
         controlsRef.current.update();
       }
@@ -229,7 +228,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
     // 2. Camera
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    camera.position.set(0, 0, 2.5);
+    camera.position.set(0, 0, 2.8);
     cameraRef.current = camera;
 
     // 3. Renderer with SRGB color space and ACES tone mapping
@@ -237,26 +236,34 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.0;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 4. Studio Lighting for realistic glTF materials
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    // 4. Room Environment for realistic PBR shading & reflections
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    const roomEnv = new RoomEnvironment();
+    const envTexture = pmrem.fromScene(roomEnv, 0.04).texture;
+    scene.environment = envTexture;
+
+    // Balanced studio lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.2);
     keyLight.position.set(2, 3, 3);
     scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(0xbbe8f2, 1.2);
+    const fillLight = new THREE.DirectionalLight(0xbbe8f2, 0.7);
     fillLight.position.set(-2, 1, 2);
     scene.add(fillLight);
 
-    const rimLight = new THREE.DirectionalLight(0xa5b4fc, 1.8);
+    const rimLight = new THREE.DirectionalLight(0xa5b4fc, 0.8);
     rimLight.position.set(0, 3, -3);
     scene.add(rimLight);
+
 
     // 5. Controls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -685,6 +692,18 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </label>
 
           <button
+            onClick={() => {
+              if (avatarRef.current) {
+                avatarRef.current.root.rotation.y += Math.PI;
+              }
+            }}
+            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10 transition shadow-lg"
+            title="Rotate 180°"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+
+          <button
             onClick={() => setShowInspector(!showInspector)}
             className={`p-2 rounded-xl border transition shadow-lg ${
               showInspector
@@ -705,6 +724,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
         </div>
       </div>
+
 
       {/* URL Dialog Modal */}
       {showUrlDialog && (
