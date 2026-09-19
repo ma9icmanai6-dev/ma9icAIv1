@@ -129,9 +129,9 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     const height = Math.max(size.y, 0.5);
     const verticalFov = THREE.MathUtils.degToRad(cameraRef.current.fov);
     const distance = fitFullBody
-      ? height / (2 * Math.tan(verticalFov / 2) * 0.045)
-      : Math.max(2.8, height / (2 * Math.tan(verticalFov / 2) * 0.72));
-    const targetY = fitFullBody ? center.y - height * 0.15 : bounds.min.y + height * 0.86;
+      ? height / (2 * Math.tan(verticalFov / 2) * 0.45)
+      : Math.max(2.8, height / (2 * Math.tan(verticalFov / 2) * 0.82));
+    const targetY = fitFullBody ? center.y + height * 0.65 : bounds.min.y + height * 0.86;
 
     cameraRef.current.position.set(center.x, targetY, distance);
     controlsRef.current.target.set(center.x, targetY, 0);
@@ -596,18 +596,18 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       <div ref={containerRef} className="relative flex-1 w-full h-full cursor-grab active:cursor-grabbing" />
 
       {modelOnly && (
-        <div className="absolute inset-x-0 top-[14%] flex items-center justify-center gap-2 pointer-events-none z-40">
+        <div className="absolute inset-x-0 top-[27%] flex items-center justify-center gap-2 pointer-events-none z-40">
           <button
             onClick={onSpeakGreeting}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-sky-300/30 bg-slate-950/75 text-sky-200 shadow-lg backdrop-blur-xl transition hover:bg-sky-500/20"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-pink-200/60 bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 text-white shadow-lg shadow-pink-950/40 backdrop-blur-xl transition hover:brightness-125"
             title="Talk to Magic"
           >
             <Volume2 className="h-4 w-4" />
           </button>
           <button
             onClick={onToggleListening}
-            className={`pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border bg-slate-950/75 shadow-lg backdrop-blur-xl transition hover:bg-emerald-500/20 ${
-              isSpeaking ? "border-emerald-300/50 text-emerald-200" : "border-white/20 text-slate-200"
+            className={`pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-xl transition hover:brightness-125 ${
+              isSpeaking ? "border-lime-200/70 bg-gradient-to-br from-lime-400 via-emerald-500 to-cyan-500 text-white" : "border-cyan-200/60 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white"
             }`}
             title="Toggle microphone"
           >
@@ -615,28 +615,28 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
           <button
             onClick={onCaptureScreen}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-purple-300/30 bg-slate-950/75 text-purple-200 shadow-lg backdrop-blur-xl transition hover:bg-purple-500/20"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-violet-200/60 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500 text-white shadow-lg shadow-violet-950/40 backdrop-blur-xl transition hover:brightness-125"
             title="Scan desktop screen"
           >
             <Eye className="h-4 w-4" />
           </button>
           <button
             onClick={() => onQuickAction?.("todo")}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-cyan-300/30 bg-slate-950/75 text-cyan-200 shadow-lg shadow-cyan-950/30 backdrop-blur-xl transition hover:bg-cyan-500/20"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-cyan-200/60 bg-gradient-to-br from-cyan-400 via-teal-500 to-emerald-500 text-white shadow-lg shadow-cyan-950/30 backdrop-blur-xl transition hover:brightness-125"
             title="Ask Magic to manage your to-do list"
           >
             <ListTodo className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onQuickAction?.("important")}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/30 bg-slate-950/75 text-amber-200 shadow-lg shadow-amber-950/30 backdrop-blur-xl transition hover:bg-amber-500/20"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-amber-100/70 bg-gradient-to-br from-yellow-300 via-amber-500 to-red-500 text-white shadow-lg shadow-amber-950/30 backdrop-blur-xl transition hover:brightness-125"
             title="Ask Magic to surface important items"
           >
             <Star className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onToggleFullView}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-slate-950/75 text-slate-200 shadow-lg backdrop-blur-xl transition hover:bg-white/15"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-slate-100 via-slate-400 to-slate-700 text-slate-950 shadow-lg backdrop-blur-xl transition hover:brightness-125"
             title="Open the full assistant"
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
