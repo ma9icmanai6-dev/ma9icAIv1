@@ -1,4 +1,4 @@
-const {app, BrowserWindow, ipcMain} = require("electron");
+const {app, BrowserWindow, ipcMain, screen} = require("electron");
 const path = require("path");
 const http = require("http");
 
@@ -9,6 +9,32 @@ ipcMain.on("magic-window-move", (event, deltaX, deltaY) => {
   if (!window || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return;
   const [x, y] = window.getPosition();
   window.setPosition(Math.round(x + deltaX), Math.round(y + deltaY));
+});
+
+ipcMain.on("magic-window-layout", (event, overlayMode) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window || typeof overlayMode !== "boolean") return;
+
+  if (overlayMode) {
+    const workArea = screen.getPrimaryDisplay().workArea;
+    const width = 430;
+    const height = 620;
+    window.setMinimumSize(320, 420);
+    window.setBounds({
+      x: workArea.x + workArea.width - width - 18,
+      y: workArea.y + workArea.height - height,
+      width,
+      height,
+    });
+  } else {
+    window.setMinimumSize(960, 640);
+    window.setBounds({
+      x: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.width - 1440) / 2)),
+      y: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.height - 900) / 2)),
+      width: 1440,
+      height: 900,
+    });
+  }
 });
 
 function waitForServer(url, attempts = 80) {

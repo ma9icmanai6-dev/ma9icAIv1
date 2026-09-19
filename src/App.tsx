@@ -60,6 +60,10 @@ export default function App() {
     return () => document.body.classList.remove("desktop-shell");
   }, [isDesktopShell]);
 
+  useEffect(() => {
+    (window as any).magicWindow?.setOverlayMode(experienceMode === "model");
+  }, [experienceMode]);
+
   // Voice Settings & Modal
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(VoiceEngine.getSettings());
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -477,6 +481,9 @@ export default function App() {
           isSpeaking={assistantState === "speaking"}
           audioLevel={audioLevel}
           modelOnly
+          onSpeakGreeting={triggerMagicGreeting}
+          onToggleListening={handleToggleListening}
+          onCaptureScreen={handleCaptureScreen}
           onQuickAction={handleModelQuickAction}
           onToggleFullView={() => setExperienceMode("full")}
           className="h-screen w-screen"

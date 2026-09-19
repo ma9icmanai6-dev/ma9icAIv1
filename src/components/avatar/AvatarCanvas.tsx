@@ -15,6 +15,7 @@ import {
   Sparkles,
   Sliders,
   Volume2,
+  Mic,
   Eye,
   Maximize2,
   CheckCircle2,
@@ -38,6 +39,8 @@ interface AvatarCanvasProps {
   audioLevel?: number;
   onSpeakGreeting?: () => void;
   onQuickAction?: (action: "todo" | "important" | "inspect") => void;
+  onToggleListening?: () => void;
+  onCaptureScreen?: () => void;
   onToggleFullView?: () => void;
   modelOnly?: boolean;
   className?: string;
@@ -48,6 +51,8 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   audioLevel = 0,
   onSpeakGreeting,
   onQuickAction,
+  onToggleListening,
+  onCaptureScreen,
   onToggleFullView,
   modelOnly = false,
   className = "",
@@ -124,10 +129,9 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     const height = Math.max(size.y, 0.5);
     const verticalFov = THREE.MathUtils.degToRad(cameraRef.current.fov);
     const distance = fitFullBody
-      ? height / (2 * Math.tan(verticalFov / 2) * 0.35)
+      ? height / (2 * Math.tan(verticalFov / 2) * 0.045)
       : Math.max(2.8, height / (2 * Math.tan(verticalFov / 2) * 0.72));
-    const visibleHeight = 2 * distance * Math.tan(verticalFov / 2);
-    const targetY = fitFullBody ? bounds.min.y + visibleHeight * 0.4 : bounds.min.y + height * 0.86;
+    const targetY = fitFullBody ? center.y - height * 0.15 : bounds.min.y + height * 0.86;
 
     cameraRef.current.position.set(center.x, targetY, distance);
     controlsRef.current.target.set(center.x, targetY, 0);
@@ -326,7 +330,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.minDistance = 1.0;
-    controls.maxDistance = 6.0;
+    controls.maxDistance = 100.0;
     controls.maxPolarAngle = Math.PI / 2 + 0.2;
     controls.target.set(0, 0, 0);
     controlsRef.current = controls;
@@ -592,30 +596,50 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       <div ref={containerRef} className="relative flex-1 w-full h-full cursor-grab active:cursor-grabbing" />
 
       {modelOnly && (
-        <div className="absolute inset-x-0 top-[18%] flex items-center justify-center gap-2 pointer-events-none z-40">
+        <div className="absolute inset-x-0 top-[14%] flex items-center justify-center gap-2 pointer-events-none z-40">
+          <button
+            onClick={onSpeakGreeting}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-sky-300/30 bg-slate-950/75 text-sky-200 shadow-lg backdrop-blur-xl transition hover:bg-sky-500/20"
+            title="Talk to Magic"
+          >
+            <Volume2 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onToggleListening}
+            className={`pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border bg-slate-950/75 shadow-lg backdrop-blur-xl transition hover:bg-emerald-500/20 ${
+              isSpeaking ? "border-emerald-300/50 text-emerald-200" : "border-white/20 text-slate-200"
+            }`}
+            title="Toggle microphone"
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onCaptureScreen}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-purple-300/30 bg-slate-950/75 text-purple-200 shadow-lg backdrop-blur-xl transition hover:bg-purple-500/20"
+            title="Scan desktop screen"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
           <button
             onClick={() => onQuickAction?.("todo")}
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-cyan-300/30 bg-slate-950/75 px-3 py-2 text-[11px] font-semibold text-cyan-200 shadow-lg shadow-cyan-950/30 backdrop-blur-xl transition hover:bg-cyan-500/20"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-cyan-300/30 bg-slate-950/75 text-cyan-200 shadow-lg shadow-cyan-950/30 backdrop-blur-xl transition hover:bg-cyan-500/20"
             title="Ask Magic to manage your to-do list"
           >
             <ListTodo className="h-3.5 w-3.5" />
-            <span>To-do</span>
           </button>
           <button
             onClick={() => onQuickAction?.("important")}
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-amber-300/30 bg-slate-950/75 px-3 py-2 text-[11px] font-semibold text-amber-200 shadow-lg shadow-amber-950/30 backdrop-blur-xl transition hover:bg-amber-500/20"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/30 bg-slate-950/75 text-amber-200 shadow-lg shadow-amber-950/30 backdrop-blur-xl transition hover:bg-amber-500/20"
             title="Ask Magic to surface important items"
           >
             <Star className="h-3.5 w-3.5" />
-            <span>Important</span>
           </button>
           <button
             onClick={onToggleFullView}
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/75 px-3 py-2 text-[11px] font-semibold text-slate-200 shadow-lg backdrop-blur-xl transition hover:bg-white/15"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-slate-950/75 text-slate-200 shadow-lg backdrop-blur-xl transition hover:bg-white/15"
             title="Open the full assistant"
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
-            <span>Full view</span>
           </button>
         </div>
       )}
