@@ -556,7 +556,7 @@ export default function App() {
       </header>
 
       {/* Main Assistant Body */}
-      <main className="relative z-10 flex-1 flex flex-col max-w-4xl w-full mx-auto overflow-hidden">
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col max-w-4xl w-full mx-auto overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
         {/* Dynamic Visual Stage: 3D Rigged Head or Luminous Orb */}
         <div className="shrink-0 border-b border-slate-800/40 bg-gradient-to-b from-slate-950/40 to-transparent">
           {visualMode === "avatar" ? (
@@ -564,7 +564,7 @@ export default function App() {
               isSpeaking={assistantState === "speaking"}
               audioLevel={audioLevel}
               onSpeakGreeting={triggerMagicGreeting}
-              className="h-64 sm:h-72 w-full"
+              className="h-56 sm:h-64 w-full"
             />
           ) : (
             <VoiceOrb

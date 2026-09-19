@@ -14,9 +14,7 @@ import {
   Sliders,
   Volume2,
   Eye,
-  Smile,
   Maximize2,
-  Info,
   CheckCircle2,
   Link,
   ChevronDown,
@@ -26,6 +24,8 @@ import {
   Search,
   RotateCcw,
 } from "lucide-react";
+
+const STARTUP_MODEL_URL = "/api/models/nova.compressed.glb";
 
 interface AvatarCanvasProps {
   isSpeaking: boolean;
@@ -84,6 +84,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const [isCustomModel, setIsCustomModel] = useState<boolean>(true);
   const [morphTargetNames, setMorphTargetNames] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadProgress, setLoadProgress] = useState<number | null>(null);
   const [showInspector, setShowInspector] = useState<boolean>(false);
   const [manualWeights, setManualWeights] = useState<Record<string, number>>({});
   const [dragOver, setDragOver] = useState<boolean>(false);
@@ -123,26 +124,36 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     if (!targetScene) return;
 
     setIsLoading(true);
+    setLoadProgress(null);
     const fileName = url.split("/").pop() || "3D Model";
     setStatusMessage(`Loading 3D model: ${fileName}...`);
 
     try {
-      const loadedAvatar = await AvatarModelLoader.loadGLB(url);
+      const loadedAvatar = await AvatarModelLoader.loadGLB(url, (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          setLoadProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      });
+
+      if (targetScene !== sceneRef.current) return;
 
       if (avatarRef.current) {
         targetScene.remove(avatarRef.current.root);
       }
 
+      if (url === STARTUP_MODEL_URL) {
+        loadedAvatar.root.rotation.y = Math.PI;
+      }
       targetScene.add(loadedAvatar.root);
       avatarRef.current = loadedAvatar;
 
       if (cameraRef.current && controlsRef.current) {
-        cameraRef.current.position.set(0, 0, 2.5);
+        cameraRef.current.position.set(0, 0, 4.0);
         controlsRef.current.target.set(0, 0, 0);
         controlsRef.current.update();
       }
 
-      const displayName = fileName === "avatar.glb" ? "ReadyPlayerMe Avatar (avatar.glb)" : fileName;
+      const displayName = url === STARTUP_MODEL_URL ? "nova.compressed.glb" : fileName;
       setModelName(displayName);
       setIsCustomModel(true);
       setMorphTargetNames(loadedAvatar.morphNames);
@@ -153,6 +164,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       loadDefaultHead(targetScene);
     } finally {
       setIsLoading(false);
+      setLoadProgress(null);
       setShowModelMenu(false);
     }
   }, [loadDefaultHead]);
@@ -163,6 +175,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const loadCustomModelFile = useCallback(async (file: File) => {
     if (!sceneRef.current) return;
     setIsLoading(true);
+    setLoadProgress(null);
     setStatusMessage(`Parsing 3D mesh and morph targets from ${file.name}...`);
 
     try {
@@ -196,6 +209,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       );
     } finally {
       setIsLoading(false);
+      setLoadProgress(null);
       setShowModelMenu(false);
     }
   }, []);
@@ -254,8 +268,8 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     controls.target.set(0, 0, 0);
     controlsRef.current = controls;
 
-    // 6. Load bundled 3D avatar (avatar.glb) with fallback to procedural head
-    loadModelFromPath("/models/avatar.glb", scene);
+    // 6. Load the startup avatar with fallback to procedural head
+    loadModelFromPath(STARTUP_MODEL_URL, scene);
 
     // 7. Subscribe to LipSyncEngine
     const lipSync = LipSyncEngine.getInstance();
@@ -435,9 +449,13 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       unsubLipSync();
       timer.dispose();
+      controls.dispose();
       renderer.dispose();
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement);
+      if (sceneRef.current === scene) {
+        sceneRef.current = null;
+      }
+      if (renderer.domElement.parentElement) {
+        renderer.domElement.parentElement.removeChild(renderer.domElement);
       }
     };
   }, [loadModelFromPath]);
@@ -476,20 +494,10 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
    */
   const handleResetCamera = () => {
     if (cameraRef.current && controlsRef.current) {
-      cameraRef.current.position.set(0, 0, 2.5);
+      cameraRef.current.position.set(0, 0, 4.0);
       controlsRef.current.target.set(0, 0, 0);
       controlsRef.current.update();
     }
-  };
-
-  /**
-   * Test Visemes
-   */
-  const handleTestVisemes = () => {
-    setStatusMessage("Running phonetic viseme test (A, E, I, O, U, PP, SS, CH)...");
-    LipSyncEngine.getInstance().runVisemeTest(() => {
-      setStatusMessage("Viseme test complete.");
-    });
   };
 
   /**
@@ -534,6 +542,19 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
         <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-white z-30">
           <RefreshCw className="w-8 h-8 text-sky-400 animate-spin mb-3" />
           <p className="text-sm font-medium">{statusMessage}</p>
+          <div className="mt-4 w-64 max-w-[75%]">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full bg-sky-400 transition-[width] duration-200 ${
+                  loadProgress === null ? "w-1/3 animate-pulse" : ""
+                }`}
+                style={loadProgress === null ? undefined : {width: `${loadProgress}%`}}
+              />
+            </div>
+            <div className="mt-1 text-center text-[10px] text-slate-400">
+              {loadProgress === null ? "Preparing model..." : `${loadProgress}%`}
+            </div>
+          </div>
         </div>
       )}
 
@@ -740,22 +761,8 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
       {/* Bottom Floating Action Bar */}
       <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none z-20">
-        {/* Status Pill */}
-        <div className="flex items-center gap-2 bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[11px] text-slate-300 pointer-events-auto max-w-full truncate">
-          <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-          <span className="truncate">{statusMessage}</span>
-        </div>
-
         {/* Interactive Speech & Viseme Trigger Buttons */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          <button
-            onClick={handleTestVisemes}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-medium transition shadow-md"
-          >
-            <Smile className="w-3.5 h-3.5 text-amber-400" />
-            <span>Test Visemes</span>
-          </button>
-
           {onSpeakGreeting && (
             <button
               onClick={onSpeakGreeting}

@@ -218,7 +218,10 @@ export class AvatarModelLoader {
   /**
    * Loads a .glb/.gltf model from a URL or ArrayBuffer
    */
-  public static async loadGLB(urlOrBuffer: string | ArrayBuffer): Promise<LoadedAvatar> {
+  public static async loadGLB(
+    urlOrBuffer: string | ArrayBuffer,
+    onProgress?: (event: ProgressEvent<EventTarget>) => void
+  ): Promise<LoadedAvatar> {
     const loader = this.getGLTFLoader();
 
     if (typeof urlOrBuffer !== "string") {
@@ -250,7 +253,7 @@ export class AvatarModelLoader {
             reject(err);
           }
         },
-        undefined,
+          onProgress,
         (error) => {
           reject(error);
         }
@@ -292,7 +295,6 @@ export class AvatarModelLoader {
         if (mesh.material) {
           const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           materials.forEach((mat) => {
-            // Only set DoubleSide on non-transparent materials to avoid alpha z-sorting glitches
             if (!mat.transparent) {
               mat.side = THREE.DoubleSide;
             }

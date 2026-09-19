@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import {Readable} from "stream";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -11,11 +12,30 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
+const DRIVE_MODEL_URL =
+  "https://drive.usercontent.google.com/download?id=1E8vLwev8HQ45GzvWXaQoRZSXf70ugSuG&export=download&confirm=t&uuid=6304dde7-d9a9-4d7c-8b64-83ed2dbc82f3";
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use("/models", express.static(path.join(process.cwd(), "public", "models")));
 app.use(express.static(path.join(process.cwd(), "public")));
+
+app.get("/api/models/nova.compressed.glb", async (_req, res) => {
+  try {
+    const modelResponse = await fetch(DRIVE_MODEL_URL);
+    if (!modelResponse.ok || !modelResponse.body) {
+      return res.status(modelResponse.status || 502).send("Unable to download avatar model");
+    }
+
+    res.setHeader("Content-Type", modelResponse.headers.get("content-type") || "model/gltf-binary");
+    const contentLength = modelResponse.headers.get("content-length");
+    if (contentLength) res.setHeader("Content-Length", contentLength);
+    Readable.fromWeb(modelResponse.body as any).pipe(res);
+  } catch (error) {
+    console.error("Error proxying avatar model:", error);
+    if (!res.headersSent) res.status(502).send("Unable to download avatar model");
+  }
+});
 
 // Server-side Gemini initialization
 let aiClient: GoogleGenAI | null = null;
