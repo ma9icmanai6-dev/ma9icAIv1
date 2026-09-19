@@ -7,14 +7,15 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const APP_ROOT = process.env.MAGIC_APP_ROOT || process.cwd();
+const PORT = Number(process.env.PORT || 3000);
 const DRIVE_MODEL_URL =
   "https://drive.usercontent.google.com/download?id=1E8vLwev8HQ45GzvWXaQoRZSXf70ugSuG&export=download&confirm=t&uuid=6304dde7-d9a9-4d7c-8b64-83ed2dbc82f3";
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-app.use("/models", express.static(path.join(process.cwd(), "public", "models")));
-app.use(express.static(path.join(process.cwd(), "public")));
+app.use("/models", express.static(path.join(APP_ROOT, "public", "models")));
+app.use(express.static(path.join(APP_ROOT, "public")));
 
 app.get("/api/models/nova.compressed.glb", async (_req, res) => {
   try {
@@ -348,7 +349,7 @@ async function start() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    const distPath = path.join(APP_ROOT, "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
