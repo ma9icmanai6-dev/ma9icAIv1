@@ -36,7 +36,11 @@ async function createWindow() {
     height: 900,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: "#020617",
+    transparent: true,
+    frame: false,
+    hasShadow: false,
+    alwaysOnTop: true,
+    backgroundColor: "#00000000",
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
@@ -44,7 +48,7 @@ async function createWindow() {
     },
   });
 
-  await window.loadURL(`http://127.0.0.1:${port}`);
+  await window.loadURL(`http://127.0.0.1:${port}/?desktop=1`);
 }
 
 app.whenReady().then(createWindow).catch((error) => {

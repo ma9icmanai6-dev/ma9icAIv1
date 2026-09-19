@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 
 export default function App() {
+  const isDesktopShell = new URLSearchParams(window.location.search).has("desktop");
+
   // Assistant core state
   const [assistantState, setAssistantState] = useState<AssistantState>("idle");
   const [isListening, setIsListening] = useState(false);
@@ -51,6 +53,11 @@ export default function App() {
   const [visionThumbnail, setVisionThumbnail] = useState<string | undefined>(undefined);
   const [isAnalyzingVision, setIsAnalyzingVision] = useState(false);
   const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle("desktop-shell", isDesktopShell);
+    return () => document.body.classList.remove("desktop-shell");
+  }, [isDesktopShell]);
 
   // Voice Settings & Modal
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(VoiceEngine.getSettings());
@@ -440,15 +447,15 @@ export default function App() {
   }, [handleSendMessage, triggerMagicGreeting]);
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col font-sans select-none relative">
+    <div className={`w-screen h-screen overflow-hidden ${isDesktopShell ? "bg-transparent desktop-shell" : "bg-slate-950"} text-slate-100 flex flex-col font-sans select-none relative`}>
       {/* Background ambient lighting */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className={`${isDesktopShell ? "hidden" : ""} absolute inset-0 pointer-events-none overflow-hidden`}>
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-indigo-600/10 rounded-full blur-3xl" />
         <div className="absolute top-1/3 -right-20 w-[400px] h-[400px] bg-cyan-600/5 rounded-full blur-3xl" />
       </div>
 
       {/* Top Header Bar */}
-      <header className="relative z-10 shrink-0 h-16 px-6 border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl flex items-center justify-between">
+      <header className={`relative z-10 shrink-0 h-16 px-6 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-between`}>
         {/* Brand & Identity */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">

@@ -1,1 +1,29 @@
 @import "tailwindcss";
+
+html,
+body,
+#root {
+	width: 100%;
+	height: 100%;
+}
+
+body.desktop-shell,
+body.desktop-shell #root {
+	background: transparent !important;
+}
+
+.desktop-shell header {
+	-webkit-app-region: drag;
+}
+
+.desktop-shell button,
+.desktop-shell input,
+.desktop-shell textarea,
+.desktop-shell label {
+	-webkit-app-region: no-drag;
+}
+
+.desktop-shell [class*="bg-"] {
+	background-color: transparent !important;
+	background-image: none !important;
+}

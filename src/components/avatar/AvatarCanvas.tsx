@@ -517,7 +517,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 overflow-hidden select-none ${className}`}
+      className={`relative w-full h-full flex flex-col ${new URLSearchParams(window.location.search).has("desktop") ? "bg-transparent" : "bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950"} overflow-hidden select-none ${className}`}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
