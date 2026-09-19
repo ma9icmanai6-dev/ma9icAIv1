@@ -1,0 +1,6 @@
+{
+  "name": "Magic AI Desktop Assistant",
+  "description": "Voice-enabled multimodal AI assistant with 3D rigged avatar head, real-time Reallusion CC4 & ARKit lip-sync, wake-word detection, continuous speech recognition, screen understanding, and memory.",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
