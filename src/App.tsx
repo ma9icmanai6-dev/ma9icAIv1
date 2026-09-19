@@ -40,6 +40,7 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [visualMode, setVisualMode] = useState<"avatar" | "orb">("avatar");
+  const [experienceMode, setExperienceMode] = useState<"full" | "model">("full");
 
   // Chat conversation
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -382,6 +383,17 @@ export default function App() {
     }
   }, [isListening]);
 
+  const handleModelQuickAction = useCallback(
+    (action: "todo" | "important" | "inspect") => {
+      const prompts = {
+        todo: "Show me my important to-do items and help me decide what to do next.",
+        important: "Review our conversation and tell me the most important items I should remember or act on.",
+        inspect: "Inspect my screen and tell me what is active.",
+      };
+      handleSendMessage(prompts[action]);
+    },
+    [handleSendMessage]
+  );
   // Click on the orb triggers "Hi, how can I help you?" or stops speaking
   const handleOrbClick = useCallback(() => {
     if (assistantState === "speaking") {
@@ -411,15 +423,26 @@ export default function App() {
   useEffect(() => {
     // 1. Load memories
     setMemories(MemoryService.getMemories());
+    let cleanupVoices = () => {};
 
     // 2. Load SpeechSynthesis voices
     if ("speechSynthesis" in window) {
       const updateVoices = () => {
-        const v = window.speechSynthesis.getVoices();
-        setAvailableVoices(v);
+        const engineVoices = VoiceEngine.getVoices();
+        const browserVoices = window.speechSynthesis.getVoices();
+        const voices = [...engineVoices, ...browserVoices].filter(
+          (voice, index, all) => all.findIndex((candidate) => candidate.name === voice.name) === index
+        );
+        if (voices.length > 0) setAvailableVoices(voices);
       };
       updateVoices();
-      window.speechSynthesis.onvoiceschanged = updateVoices;
+      window.speechSynthesis.addEventListener("voiceschanged", updateVoices);
+      const voiceLoadRetry = window.setInterval(updateVoices, 250);
+      window.setTimeout(() => window.clearInterval(voiceLoadRetry), 5000);
+      cleanupVoices = () => {
+        window.speechSynthesis.removeEventListener("voiceschanged", updateVoices);
+        window.clearInterval(voiceLoadRetry);
+      };
     }
 
     // 3. Connect speech recognition callback
@@ -439,6 +462,7 @@ export default function App() {
     });
 
     return () => {
+      cleanupVoices();
       unsubSpeech();
       unsubWake();
       unsubAudio();
@@ -448,6 +472,17 @@ export default function App() {
 
   return (
     <div className={`w-screen h-screen overflow-hidden ${isDesktopShell ? "bg-transparent desktop-shell" : "bg-slate-950"} text-slate-100 flex flex-col font-sans select-none relative`}>
+      {experienceMode === "model" ? (
+        <AvatarCanvas
+          isSpeaking={assistantState === "speaking"}
+          audioLevel={audioLevel}
+          modelOnly
+          onQuickAction={handleModelQuickAction}
+          onToggleFullView={() => setExperienceMode("full")}
+          className="h-screen w-screen"
+        />
+      ) : (
+        <>
       {/* Background ambient lighting */}
       <div className={`${isDesktopShell ? "hidden" : ""} absolute inset-0 pointer-events-none overflow-hidden`}>
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-indigo-600/10 rounded-full blur-3xl" />
@@ -539,6 +574,15 @@ export default function App() {
               <span className="hidden sm:inline">Orb</span>
             </button>
           </div>
+
+          {/* Model-only overlay mode */}
+          <button
+            onClick={() => setExperienceMode("model")}
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title="Show model only"
+          >
+            <User className="w-4 h-4" />
+          </button>
 
           {/* Settings Button */}
           <button
@@ -634,6 +678,8 @@ export default function App() {
         thumbnailUrl={visionThumbnail}
         onActionClick={handleSendMessage}
       />
+        </>
+      )}
     </div>
   );
 }

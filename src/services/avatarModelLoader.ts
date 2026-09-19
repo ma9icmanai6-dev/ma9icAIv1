@@ -436,9 +436,9 @@ export class AvatarModelLoader {
     // Capture initial rest pose rotation of the head bone to avoid jerking during idle sway
     const initialBoneRotation = headBone ? headBone.rotation.clone() : undefined;
 
-    // Reset root transforms and set default 180 degree rotation
+    // Reset root transforms. Imported ReadyPlayerMe models already face the camera.
     root.position.set(0, 0, 0);
-    root.rotation.set(0, Math.PI, 0);
+    root.rotation.set(0, 0, 0);
     root.scale.set(1, 1, 1);
     root.updateMatrixWorld(true);
 

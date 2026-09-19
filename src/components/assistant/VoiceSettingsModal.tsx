@@ -61,7 +61,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
               }}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="default">Default British Female (Recommended)</option>
+              <option value="default">Auto-select British female (Recommended)</option>
               {availableVoices.map((v) => (
                 <option key={v.name} value={v.name}>
                   {v.name} ({v.lang})

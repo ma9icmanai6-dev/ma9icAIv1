@@ -42,13 +42,16 @@ export class VisionService {
 
     // Capture frame on canvas
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1920;
-    canvas.height = video.videoHeight || 1080;
+    const sourceWidth = video.videoWidth || 1920;
+    const sourceHeight = video.videoHeight || 1080;
+    const scale = Math.min(1, 1600 / sourceWidth, 900 / sourceHeight);
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Could not initialize 2D canvas context");
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/png");
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
 
     // Clean up tracks immediately
     stream.getTracks().forEach((t) => t.stop());
@@ -75,13 +78,16 @@ export class VisionService {
     await video.play();
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const sourceWidth = video.videoWidth || 1280;
+    const sourceHeight = video.videoHeight || 720;
+    const scale = Math.min(1, 1600 / sourceWidth, 900 / sourceHeight);
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Could not initialize 2D canvas context");
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/png");
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
 
     stream.getTracks().forEach((t) => t.stop());
     video.srcObject = null;

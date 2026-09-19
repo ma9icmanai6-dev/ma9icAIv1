@@ -417,7 +417,7 @@ Return structured JSON analysis in this exact format:
             },
           ],
           formatJson: true,
-          timeoutMs: 90000,
+          timeoutMs: 180000,
         });
 
         let parsed: any;

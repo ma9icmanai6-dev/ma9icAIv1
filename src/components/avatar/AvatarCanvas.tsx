@@ -25,6 +25,10 @@ import {
   X,
   Search,
   RotateCcw,
+  ListTodo,
+  Star,
+  LayoutDashboard,
+  Move,
 } from "lucide-react";
 
 const STARTUP_MODEL_URL = "/api/models/nova.compressed.glb";
@@ -33,6 +37,9 @@ interface AvatarCanvasProps {
   isSpeaking: boolean;
   audioLevel?: number;
   onSpeakGreeting?: () => void;
+  onQuickAction?: (action: "todo" | "important" | "inspect") => void;
+  onToggleFullView?: () => void;
+  modelOnly?: boolean;
   className?: string;
 }
 
@@ -40,6 +47,9 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   isSpeaking,
   audioLevel = 0,
   onSpeakGreeting,
+  onQuickAction,
+  onToggleFullView,
+  modelOnly = false,
   className = "",
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +59,8 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const controlsRef = useRef<OrbitControls | null>(null);
   const avatarRef = useRef<LoadedAvatar | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const modelOnlyRef = useRef(modelOnly);
+  const dragRef = useRef<{x: number; y: number} | null>(null);
 
   // Blendshape tracking
   const currentMorphInfluences = useRef<{ [key: string]: number }>({});
@@ -95,6 +107,51 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const [showUrlDialog, setShowUrlDialog] = useState<boolean>(false);
   const [customUrlInput, setCustomUrlInput] = useState<string>("");
   const [morphSearchQuery, setMorphSearchQuery] = useState<string>("");
+
+  useEffect(() => {
+    modelOnlyRef.current = modelOnly;
+    if (avatarRef.current) {
+      frameAvatar(avatarRef.current.root, modelOnly);
+    }
+  }, [modelOnly]);
+
+  const frameAvatar = useCallback((root: THREE.Object3D, fitFullBody: boolean) => {
+    if (!cameraRef.current || !controlsRef.current) return;
+
+    const bounds = new THREE.Box3().setFromObject(root);
+    const size = bounds.getSize(new THREE.Vector3());
+    const center = bounds.getCenter(new THREE.Vector3());
+    const height = Math.max(size.y, 0.5);
+    const verticalFov = THREE.MathUtils.degToRad(cameraRef.current.fov);
+    const distance = fitFullBody
+      ? height / (2 * Math.tan(verticalFov / 2) * 0.35)
+      : Math.max(2.8, height / (2 * Math.tan(verticalFov / 2) * 0.72));
+    const visibleHeight = 2 * distance * Math.tan(verticalFov / 2);
+    const targetY = fitFullBody ? bounds.min.y + visibleHeight * 0.4 : bounds.min.y + height * 0.86;
+
+    cameraRef.current.position.set(center.x, targetY, distance);
+    controlsRef.current.target.set(center.x, targetY, 0);
+    controlsRef.current.update();
+  }, []);
+
+  const handleDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragRef.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const deltaX = event.clientX - dragRef.current.x;
+    const deltaY = event.clientY - dragRef.current.y;
+    dragRef.current = { x: event.clientX, y: event.clientY };
+    (window as any).magicWindow?.moveBy(deltaX, deltaY);
+  };
+
+  const handleDragEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
 
   /**
    * Helper to load the procedural default head
@@ -147,9 +204,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       avatarRef.current = loadedAvatar;
 
       if (cameraRef.current && controlsRef.current) {
-        cameraRef.current.position.set(0, 0, 2.8);
-        controlsRef.current.target.set(0, 0, 0);
-        controlsRef.current.update();
+        frameAvatar(loadedAvatar.root, modelOnlyRef.current);
       }
 
       const displayName = url === STARTUP_MODEL_URL ? "nova.compressed.glb" : fileName;
@@ -166,7 +221,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       setLoadProgress(null);
       setShowModelMenu(false);
     }
-  }, [loadDefaultHead]);
+  }, [frameAvatar, loadDefaultHead]);
 
   /**
    * Load custom user 3D model (.glb, .gltf, .vrm, .obj - e.g. Reallusion CC4, ReadyPlayerMe, Blender)
@@ -201,6 +256,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       setStatusMessage(
         `Loaded ${file.name} (${loadedAvatar.morphNames.length} morph targets detected)`
       );
+      frameAvatar(loadedAvatar.root, modelOnlyRef.current);
     } catch (err: any) {
       console.error("Error parsing 3D file:", err);
       setStatusMessage(
@@ -524,7 +580,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col ${new URLSearchParams(window.location.search).has("desktop") ? "bg-transparent" : "bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950"} overflow-hidden select-none ${className}`}
+      className={`relative w-full h-full flex flex-col ${modelOnly || new URLSearchParams(window.location.search).has("desktop") ? "bg-transparent" : "bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950"} overflow-hidden select-none ${className}`}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -534,6 +590,48 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     >
       {/* Canvas Viewport */}
       <div ref={containerRef} className="relative flex-1 w-full h-full cursor-grab active:cursor-grabbing" />
+
+      {modelOnly && (
+        <div className="absolute inset-x-0 top-[18%] flex items-center justify-center gap-2 pointer-events-none z-40">
+          <button
+            onClick={() => onQuickAction?.("todo")}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-cyan-300/30 bg-slate-950/75 px-3 py-2 text-[11px] font-semibold text-cyan-200 shadow-lg shadow-cyan-950/30 backdrop-blur-xl transition hover:bg-cyan-500/20"
+            title="Ask Magic to manage your to-do list"
+          >
+            <ListTodo className="h-3.5 w-3.5" />
+            <span>To-do</span>
+          </button>
+          <button
+            onClick={() => onQuickAction?.("important")}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-amber-300/30 bg-slate-950/75 px-3 py-2 text-[11px] font-semibold text-amber-200 shadow-lg shadow-amber-950/30 backdrop-blur-xl transition hover:bg-amber-500/20"
+            title="Ask Magic to surface important items"
+          >
+            <Star className="h-3.5 w-3.5" />
+            <span>Important</span>
+          </button>
+          <button
+            onClick={onToggleFullView}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/75 px-3 py-2 text-[11px] font-semibold text-slate-200 shadow-lg backdrop-blur-xl transition hover:bg-white/15"
+            title="Open the full assistant"
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            <span>Full view</span>
+          </button>
+        </div>
+      )}
+
+      {modelOnly && (
+        <div
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={handleDragEnd}
+          className="absolute top-5 left-1/2 -translate-x-1/2 pointer-events-auto flex cursor-move items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/70 px-3 py-1.5 text-[10px] font-semibold text-slate-300 shadow-lg backdrop-blur-xl"
+          title="Drag Magic around your desktop"
+        >
+          <Move className="h-3.5 w-3.5" />
+          <span>Drag Magic</span>
+        </div>
+      )}
 
       {/* Drag Overlay Feedback */}
       {dragOver && (
@@ -566,7 +664,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       )}
 
       {/* Top Header Badge & Action Controls */}
-      <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-20">
+      <div className={`${modelOnly ? "hidden" : ""} absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-20`}>
         {/* Model Info with Selector Trigger */}
         <div className="relative pointer-events-auto">
           <button
@@ -727,7 +825,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
 
       {/* URL Dialog Modal */}
-      {showUrlDialog && (
+      {showUrlDialog && !modelOnly && (
         <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
           <div className="bg-slate-900 border border-white/15 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
@@ -780,7 +878,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       )}
 
       {/* Bottom Floating Action Bar */}
-      <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none z-20">
+      <div className={`${modelOnly ? "hidden" : ""} absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none z-20`}>
         {/* Interactive Speech & Viseme Trigger Buttons */}
         <div className="flex items-center gap-2 pointer-events-auto">
           {onSpeakGreeting && (
@@ -796,7 +894,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       </div>
 
       {/* Slide-out Morph Target Inspector Panel */}
-      {showInspector && (
+      {showInspector && !modelOnly && (
         <div className="absolute top-16 right-4 w-80 max-h-[75vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl p-4 text-slate-200 z-30 space-y-3 animate-in fade-in slide-in-from-right duration-200">
           <div className="flex items-center justify-between border-b border-white/10 pb-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-white">

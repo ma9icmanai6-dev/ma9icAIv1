@@ -342,6 +342,7 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
             onChange={(e) => onVoiceSettingsChange({ voiceName: e.target.value })}
             className="w-full p-2 bg-slate-950 border border-white/15 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500 text-xs"
           >
+            <option value="default">Auto-select British female (Recommended)</option>
             {availableVoices.length > 0 ? (
               availableVoices.map((v) => (
                 <option key={v.name} value={v.name}>

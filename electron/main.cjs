@@ -1,8 +1,15 @@
-const {app, BrowserWindow} = require("electron");
+const {app, BrowserWindow, ipcMain} = require("electron");
 const path = require("path");
 const http = require("http");
 
 const port = Number(process.env.MAGIC_PORT || 3210);
+
+ipcMain.on("magic-window-move", (event, deltaX, deltaY) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return;
+  const [x, y] = window.getPosition();
+  window.setPosition(Math.round(x + deltaX), Math.round(y + deltaY));
+});
 
 function waitForServer(url, attempts = 80) {
   return new Promise((resolve, reject) => {
@@ -45,6 +52,7 @@ async function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(app.getAppPath(), "electron", "preload.cjs"),
     },
   });
 

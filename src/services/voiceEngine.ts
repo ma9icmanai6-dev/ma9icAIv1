@@ -122,24 +122,25 @@ export class VoiceEngine {
       this.synth = window.speechSynthesis;
       const loadVoices = () => {
         this.availableVoices = this.synth?.getVoices() || [];
-        // Look for British Female voice first
-        const britishFemale = this.availableVoices.find(
-          (v) =>
-            v.lang.toLowerCase().startsWith("en-gb") &&
-            (v.name.toLowerCase().includes("female") ||
-              v.name.toLowerCase().includes("hazel") ||
-              v.name.toLowerCase().includes("victoria") ||
-              v.name.toLowerCase().includes("sonia") ||
-              v.name.toLowerCase().includes("george") === false)
-        ) || this.availableVoices.find((v) => v.lang.toLowerCase().startsWith("en-gb"))
+        const britishVoices = this.availableVoices.filter((v) => v.lang.toLowerCase().startsWith("en-gb"));
+        const britishFemale = britishVoices.find((v) => {
+          const name = v.name.toLowerCase();
+          return ["hazel", "sonia", "susan", "libby", "victoria", "female"].some((hint) => name.includes(hint));
+        });
+        const selectedVoice = britishFemale || britishVoices.find((v) => !v.name.toLowerCase().includes("george"))
           || this.availableVoices.find((v) => v.lang.toLowerCase().startsWith("en"))
           || this.availableVoices[0];
 
-        this.selectedVoice = britishFemale || null;
+        this.selectedVoice = selectedVoice || null;
+        if (this.settings.voiceName === "default" && selectedVoice) {
+          this.settings.voiceName = selectedVoice.name;
+        }
       };
 
       loadVoices();
-      if (this.synth.onvoiceschanged !== undefined) {
+      if (typeof this.synth.addEventListener === "function") {
+        this.synth.addEventListener("voiceschanged", loadVoices);
+      } else {
         this.synth.onvoiceschanged = loadVoices;
       }
     }
@@ -150,6 +151,17 @@ export class VoiceEngine {
   }
 
   public setVoice(voiceName: string) {
+    if (voiceName === "default") {
+      const britishVoice = this.availableVoices.find((voice) => {
+        const name = voice.name.toLowerCase();
+        return voice.lang.toLowerCase().startsWith("en-gb") &&
+          ["hazel", "sonia", "susan", "libby", "victoria", "female"].some((hint) => name.includes(hint));
+      }) || this.availableVoices.find((voice) => voice.lang.toLowerCase().startsWith("en-gb"));
+      this.selectedVoice = britishVoice || this.availableVoices[0] || null;
+      this.settings.voiceName = this.selectedVoice?.name || "default";
+      return;
+    }
+
     const found = this.availableVoices.find((v) => v.name === voiceName);
     if (found) {
       this.selectedVoice = found;
