@@ -145,7 +145,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     const verticalFov = THREE.MathUtils.degToRad(cameraRef.current.fov);
     const distance = fitFullBody
       ? height / (2 * Math.tan(verticalFov / 2) * 0.45)
-      : Math.max(2.8, height / (2 * Math.tan(verticalFov / 2) * 0.82));
+      : Math.max(0.9, (height * 0.48) / (2 * Math.tan(verticalFov / 2)));
     const targetY = fitFullBody ? center.y + height * 0.65 : bounds.min.y + height * 0.86;
 
     cameraRef.current.position.set(center.x, targetY, distance);
@@ -664,16 +664,16 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       )}
 
       {modelOnly && (
-        <div className="absolute bottom-4 left-4 z-40 w-[min(330px,calc(100%-32px))] pointer-events-none">
+        <div className="absolute left-1/2 top-14 z-40 w-[min(360px,calc(100%-24px))] -translate-x-1/2 pointer-events-none">
           {voiceNotice && (
             <div className="mb-2 rounded-xl border border-rose-300/30 bg-rose-950/85 px-3 py-2 text-center text-[10px] font-medium text-rose-100 shadow-lg backdrop-blur-xl">
               {voiceNotice}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/15 bg-slate-950/75 p-2 shadow-[0_16px_50px_rgba(2,6,23,0.55)] backdrop-blur-2xl">
+          <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-white/15 bg-slate-950/75 p-2 shadow-[0_16px_50px_rgba(2,6,23,0.55)] backdrop-blur-2xl">
           <button
             onClick={onSpeakGreeting}
-            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-cyan-200/25 bg-gradient-to-br from-cyan-400/90 via-sky-500/90 to-indigo-600/95 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(14,165,233,0.24)] transition hover:-translate-y-0.5 hover:brightness-125"
+            className="pointer-events-auto flex h-9 items-center justify-center gap-1 rounded-xl border border-cyan-200/25 bg-gradient-to-br from-cyan-400/90 via-sky-500/90 to-indigo-600/95 text-[9px] font-semibold text-white shadow-[0_8px_22px_rgba(14,165,233,0.24)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Talk to Magic"
           >
             <Volume2 className="h-4 w-4" />
@@ -681,7 +681,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
           <button
             onClick={onToggleListening}
-            className={`pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border text-[10px] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:brightness-125 ${
+            className={`pointer-events-auto flex h-9 items-center justify-center gap-1 rounded-xl border text-[9px] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:brightness-125 ${
               isListening ? "border-emerald-200/50 bg-gradient-to-br from-emerald-400/90 via-cyan-500/90 to-sky-600 text-white" : "border-sky-200/25 bg-gradient-to-br from-slate-700 via-sky-600 to-indigo-700 text-white"
             }`}
             title="Toggle microphone"
@@ -691,7 +691,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
           <button
             onClick={onCaptureScreen}
-            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-indigo-200/25 bg-gradient-to-br from-indigo-500/90 via-violet-600/90 to-slate-800 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(99,102,241,0.24)] transition hover:-translate-y-0.5 hover:brightness-125"
+            className="pointer-events-auto flex h-9 items-center justify-center gap-1 rounded-xl border border-indigo-200/25 bg-gradient-to-br from-indigo-500/90 via-violet-600/90 to-slate-800 text-[9px] font-semibold text-white shadow-[0_8px_22px_rgba(99,102,241,0.24)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Scan desktop screen"
           >
             <Eye className="h-4 w-4" />
@@ -699,7 +699,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
           <button
             onClick={() => setShowModelInput((current) => !current)}
-            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-200/30 bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-[10px] font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-125"
+            className="pointer-events-auto flex h-9 items-center justify-center gap-1 rounded-xl border border-blue-200/30 bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-[9px] font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-125"
             title="Type a message to Magic"
           >
             <Keyboard className="h-4 w-4" />
@@ -707,7 +707,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
           <button
             onClick={() => onQuickAction?.("todo")}
-            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-cyan-200/25 bg-gradient-to-br from-sky-500/90 via-cyan-600/90 to-slate-800 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(6,182,212,0.22)] transition hover:-translate-y-0.5 hover:brightness-125"
+            className="pointer-events-auto flex h-9 items-center justify-center gap-1 rounded-xl border border-cyan-200/25 bg-gradient-to-br from-sky-500/90 via-cyan-600/90 to-slate-800 text-[9px] font-semibold text-white shadow-[0_8px_22px_rgba(6,182,212,0.22)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Ask Magic to manage your to-do list"
           >
             <ListTodo className="h-3.5 w-3.5" />
@@ -715,7 +715,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
           <button
             onClick={() => onQuickAction?.("important")}
-            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-200/30 bg-gradient-to-br from-amber-300/90 via-orange-500/90 to-slate-800 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(245,158,11,0.22)] transition hover:-translate-y-0.5 hover:brightness-125"
+            className="pointer-events-auto flex h-9 items-center justify-center gap-1 rounded-xl border border-amber-200/30 bg-gradient-to-br from-amber-300/90 via-orange-500/90 to-slate-800 text-[9px] font-semibold text-white shadow-[0_8px_22px_rgba(245,158,11,0.22)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Ask Magic to surface important items"
           >
             <Star className="h-3.5 w-3.5" />
@@ -723,7 +723,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </button>
           <button
             onClick={onToggleFullView}
-            className="pointer-events-auto col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-gradient-to-br from-slate-200/90 via-slate-500 to-slate-900 text-[10px] font-semibold text-slate-950 shadow-[0_8px_22px_rgba(148,163,184,0.2)] transition hover:-translate-y-0.5 hover:brightness-125"
+            className="pointer-events-auto col-span-4 flex h-9 items-center justify-center gap-1 rounded-xl border border-white/20 bg-gradient-to-br from-slate-200/90 via-slate-500 to-slate-900 text-[9px] font-semibold text-slate-950 shadow-[0_8px_22px_rgba(148,163,184,0.2)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Open the full assistant"
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
