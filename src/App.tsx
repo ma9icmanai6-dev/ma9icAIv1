@@ -109,8 +109,12 @@ export default function App() {
     const coordinates = params.coordinates || {};
     const normalizedType = actionType.toUpperCase();
     const actions: Record<string, { action: string; params: Record<string, any> }> = {
-      MOVE_MOUSE: { action: "MOVE_MOUSE", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y } },
-      CLICK_BUTTON: { action: "CLICK", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y } },
+      MOVE_MOUSE: { action: "MOVE_MOUSE", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y, coordinateSpace: params.coordinateSpace } },
+      CLICK_BUTTON: { action: "CLICK", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y, coordinateSpace: params.coordinateSpace } },
+      DOUBLE_CLICK: { action: "DOUBLE_CLICK", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y, coordinateSpace: params.coordinateSpace } },
+      RIGHT_CLICK: { action: "RIGHT_CLICK", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y, coordinateSpace: params.coordinateSpace } },
+      DRAG: { action: "DRAG", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y, endX: params.endX, endY: params.endY, coordinateSpace: params.coordinateSpace } },
+      SCROLL: { action: "SCROLL", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y, key: params.key || "{PAGEDOWN}", coordinateSpace: params.coordinateSpace } },
       TYPE_INPUT: { action: "TYPE_TEXT", params: { text: params.text || params.parameter || "" } },
       KEY_PRESS: { action: "KEY_PRESS", params: { key: params.key || params.key_combination || params.parameter || "" } },
       LAUNCH_APP: { action: "LAUNCH_APP", params: { app: params.app || params.parameter || "notepad.exe" } },
@@ -121,11 +125,14 @@ export default function App() {
     const mapped = actions[normalizedType];
     if (!mapped) throw new Error(`Unsupported desktop action: ${actionType}`);
     if (!(window as any).magicDesktop?.execute) throw new Error("Desktop control is unavailable in this app window.");
-    if (["MOVE_MOUSE", "CLICK_BUTTON"].includes(normalizedType)) {
+    if (["MOVE_MOUSE", "CLICK_BUTTON", "DOUBLE_CLICK", "RIGHT_CLICK", "DRAG", "SCROLL"].includes(normalizedType)) {
       const x = mapped.params.x;
       const y = mapped.params.y;
       if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) {
         throw new Error("This action needs screen coordinates. Ask Magic to inspect the screen first, then try again.");
+      }
+      if (normalizedType === "DRAG" && (!Number.isFinite(Number(mapped.params.endX)) || !Number.isFinite(Number(mapped.params.endY)))) {
+        throw new Error("Drag actions need a destination point.");
       }
       if (normalizedType === "NAVIGATE_URL" && !String(mapped.params.url).trim()) {
         throw new Error("No URL was provided for navigation.");
@@ -183,6 +190,7 @@ export default function App() {
             parameter: plan.steps[i].parameter,
             coordinates: plan.steps[i].coordinates,
             estimatedDurationMs: plan.steps[i].estimatedDurationMs,
+            coordinateSpace: plan.steps[i].params?.coordinateSpace,
           });
         } catch (error) {
           const rawReason = describeError(error, "The desktop action did not complete.");

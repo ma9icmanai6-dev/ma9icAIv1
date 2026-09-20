@@ -86,8 +86,8 @@ function normalizeDesktopIntent(message: string, parsed: any, visionContext: any
           planTitle: "Use visible search field",
           spokenIntro: `I found the visible search field. I will click it, enter ${query}, and submit it.`,
           steps: [
-            { stepNumber: 1, description: `Move to ${targetElement.label || "search field"}`, actionType: "MOVE_MOUSE", params: targetPoint, status: "pending", estimatedDurationMs: 600 },
-            { stepNumber: 2, description: "Click the visible search field", actionType: "CLICK_BUTTON", params: targetPoint, status: "pending", estimatedDurationMs: 200 },
+            { stepNumber: 1, description: `Move to ${targetElement.label || "search field"}`, actionType: "MOVE_MOUSE", params: { ...targetPoint, coordinateSpace: "vision" }, status: "pending", estimatedDurationMs: 600 },
+            { stepNumber: 2, description: "Click the visible search field", actionType: "CLICK_BUTTON", params: { ...targetPoint, coordinateSpace: "vision" }, status: "pending", estimatedDurationMs: 200 },
             { stepNumber: 3, description: `Type ${query}`, actionType: "TYPE_INPUT", params: { text: query }, status: "pending", estimatedDurationMs: 500 },
             { stepNumber: 4, description: "Submit the search", actionType: "KEY_PRESS", params: { key: "~" }, status: "pending", estimatedDurationMs: 300 },
           ],
@@ -109,8 +109,8 @@ function normalizeDesktopIntent(message: string, parsed: any, visionContext: any
           planTitle: `Click ${targetElement.label || "screen control"}`,
           spokenIntro: `I found ${targetElement.label || "the requested control"} on the screen. I will move there and click it.`,
           steps: [
-            { stepNumber: 1, description: `Move to ${targetElement.label || "target"}`, actionType: "MOVE_MOUSE", params: targetPoint, status: "pending", estimatedDurationMs: 600 },
-            { stepNumber: 2, description: `Click ${targetElement.label || "target"}`, actionType: "CLICK_BUTTON", params: targetPoint, status: "pending", estimatedDurationMs: 200 },
+            { stepNumber: 1, description: `Move to ${targetElement.label || "target"}`, actionType: "MOVE_MOUSE", params: { ...targetPoint, coordinateSpace: "vision" }, status: "pending", estimatedDurationMs: 600 },
+            { stepNumber: 2, description: `Click ${targetElement.label || "target"}`, actionType: "CLICK_BUTTON", params: { ...targetPoint, coordinateSpace: "vision" }, status: "pending", estimatedDurationMs: 200 },
           ],
           spokenCompletion: `${targetElement.label || "The selected control"} was clicked.`,
           currentStepIndex: 0,
@@ -457,7 +457,7 @@ Possible action types:
 - "OPEN_FILE": { "path": string }
 - "REMEMBER": { "key": string, "value": string, "category": string }
 - "FORGET": { "key": string }
-- "MULTI_STEP_PLAN": { "planTitle": string, "spokenIntro": string, "steps": Array<{ "stepNumber": number, "description": string, "actionType": "LAUNCH_APP" | "MOVE_MOUSE" | "CLICK_BUTTON" | "TYPE_INPUT" | "KEY_PRESS" | "WAIT", "params": { "app"?: string, "x"?: number, "y"?: number, "text"?: string, "key"?: string, "ms"?: number } }>, "spokenCompletion": string }
+- "MULTI_STEP_PLAN": { "planTitle": string, "spokenIntro": string, "steps": Array<{ "stepNumber": number, "description": string, "actionType": "LAUNCH_APP" | "MOVE_MOUSE" | "CLICK_BUTTON" | "DOUBLE_CLICK" | "RIGHT_CLICK" | "DRAG" | "SCROLL" | "TYPE_INPUT" | "KEY_PRESS" | "WAIT", "params": { "app"?: string, "x"?: number, "y"?: number, "endX"?: number, "endY"?: number, "coordinateSpace"?: "vision", "text"?: string, "key"?: string, "ms"?: number } }>, "spokenCompletion": string }
 - "NONE": null
 
 Return ONLY valid JSON matching this structure:

@@ -8,6 +8,8 @@ app.commandLine.appendSwitch("enable-speech-input");
 app.commandLine.appendSwitch("enable-features", "WebSpeechAPI");
 
 const port = Number(process.env.MAGIC_PORT || 3210);
+const AI_SCREEN_WIDTH = 1280;
+const AI_SCREEN_HEIGHT = 800;
 let desktopPermission = "none";
 let desktopKilled = false;
 let speechProcess = null;
@@ -96,8 +98,16 @@ async function executeDesktopAction(action, params = {}) {
     throw new Error("Desktop control is not permitted.");
   }
 
-  const x = Number(params.x);
-  const y = Number(params.y);
+  const display = screen.getPrimaryDisplay();
+  const scalePoint = (value, axisSize, aiSize) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    return params.coordinateSpace === "vision"
+      ? Math.round(numeric * axisSize / aiSize)
+      : Math.round(numeric);
+  };
+  const x = scalePoint(params.x, display.size.width, AI_SCREEN_WIDTH);
+  const y = scalePoint(params.y, display.size.height, AI_SCREEN_HEIGHT);
   if (action === "LAUNCH_APP") {
     const aliases = {
       brave: ["brave.exe", `${process.env.LOCALAPPDATA}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`, `${process.env.ProgramFiles}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`, `${process.env["ProgramFiles(x86)"]}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`],
@@ -158,12 +168,17 @@ switch ($action) {
   'MOVE_MOUSE' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]) }
   'CLICK' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]); [MagicInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [MagicInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero) }
   'RIGHT_CLICK' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]); [MagicInput]::mouse_event(8,0,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [MagicInput]::mouse_event(16,0,0,0,[UIntPtr]::Zero) }
+  'DOUBLE_CLICK' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]); 1..2 | ForEach-Object { [MagicInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [MagicInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 80 } }
+  'DRAG' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]); [MagicInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 100; [MagicInput]::SetCursorPos([int]$args[4], [int]$args[5]); Start-Sleep -Milliseconds 100; [MagicInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero) }
+  'SCROLL' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]); Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($args[3]) }
   'TYPE_TEXT' { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($args[1]) }
   'KEY_PRESS' { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($args[1]) }
   'WAIT' { Start-Sleep -Milliseconds ([int]$args[1]) }
 }`;
 
-  const actionArgs = [action, String(Number.isFinite(x) ? x : 0), String(Number.isFinite(y) ? y : 0), String(params.text || params.key || params.app || params.ms || "")];
+  const endX = scalePoint(params.endX, display.size.width, AI_SCREEN_WIDTH);
+  const endY = scalePoint(params.endY, display.size.height, AI_SCREEN_HEIGHT);
+  const actionArgs = [action, String(x), String(y), String(params.text || params.key || params.app || params.ms || ""), String(endX), String(endY)];
   const result = await runPowerShell(script, actionArgs);
   if (desktopPermission === "one_action") desktopPermission = "none";
   return result;
@@ -203,7 +218,8 @@ ipcMain.handle("desktop-capture-screen", async (event) => {
     if (!source || source.thumbnail.isEmpty()) {
       throw new Error("Windows did not return a desktop screenshot.");
     }
-    return `data:image/jpeg;base64,${source.thumbnail.toJPEG(60).toString("base64")}`;
+    const normalized = source.thumbnail.resize({ width: AI_SCREEN_WIDTH, height: AI_SCREEN_HEIGHT, quality: "good" });
+    return `data:image/jpeg;base64,${normalized.toJPEG(60).toString("base64")}`;
   } finally {
     if (wasVisible && window && !window.isDestroyed()) window.show();
   }
