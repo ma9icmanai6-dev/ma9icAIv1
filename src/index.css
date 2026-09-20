@@ -38,3 +38,13 @@ body.desktop-shell #root {
 	background-color: rgba(15, 23, 42, 0.6) !important;
 	background-image: none !important;
 }
+
+.desktop-shell .ai-model-menu-backdrop {
+	background-color: rgba(0, 0, 0, 0.6) !important;
+	background-image: none !important;
+}
+
+.desktop-shell .ai-model-menu {
+	background-color: rgba(15, 23, 42, 0.6) !important;
+	background-image: none !important;
+}

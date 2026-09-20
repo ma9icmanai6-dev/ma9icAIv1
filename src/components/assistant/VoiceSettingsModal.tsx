@@ -30,7 +30,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
 
   return (
     <div className="desktop-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="desktop-modal-panel w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 text-slate-100 relative">
+      <div className="desktop-modal-panel w-full max-w-sm max-h-[calc(100vh-24px)] overflow-y-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 text-slate-100 relative">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -51,7 +51,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
         </div>
 
         {/* Controls Body */}
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-3">
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">
               Assistant name

@@ -34,6 +34,7 @@ import {
   Loader2,
   Cpu,
   Terminal,
+  Download,
 } from "lucide-react";
 
 function describeError(error: unknown, fallback: string): string {
@@ -55,6 +56,7 @@ export default function App() {
   const [aiConnected, setAiConnected] = useState(false);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [isStartingOllama, setIsStartingOllama] = useState(false);
+  const [downloadingOllamaModel, setDownloadingOllamaModel] = useState<string | null>(null);
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const [activityText, setActivityText] = useState("");
   const [guiBlurred, setGuiBlurred] = useState(true);
@@ -1001,8 +1003,8 @@ export default function App() {
       />
 
       {isModelMenuOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-cyan-400/30 bg-slate-950 p-4 text-slate-100 shadow-2xl shadow-cyan-950/40">
+        <div className="ai-model-menu-backdrop fixed inset-0 z-[110] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="ai-model-menu w-full max-w-sm max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl border border-cyan-400/30 p-4 text-slate-100 shadow-2xl shadow-cyan-950/40">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <Cpu className="h-5 w-5 text-cyan-300" />
@@ -1021,6 +1023,45 @@ export default function App() {
                 <X className="h-4 w-4" />
                 <span>Close</span>
               </button>
+            </div>
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/70 p-3">
+              <div className="flex items-center gap-2">
+                <Download className="h-4 w-4 text-cyan-300" />
+                <div>
+                  <p className="text-xs font-semibold text-white">GPU-friendly Ollama models</p>
+                  <p className="mt-1 text-[10px] text-slate-400">Choose a smaller model for better video-card performance.</p>
+                </div>
+              </div>
+              <div className="mt-3 space-y-2">
+                {[
+                  { name: "qwen2.5vl:3b", label: "Qwen 2.5 VL 3B", note: "Vision + text · 4-8 GB VRAM" },
+                  { name: "minicpm-v", label: "MiniCPM-V", note: "Vision + text · 4-8 GB VRAM" },
+                  { name: "llama3.2:3b", label: "Llama 3.2 3B", note: "Text assistant · 4-8 GB VRAM" },
+                ].map((model) => (
+                  <div key={model.name} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-2.5 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-semibold text-slate-100">{model.label}</p>
+                      <p className="font-mono text-[9px] text-slate-500">{model.name} · {model.note}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={downloadingOllamaModel !== null}
+                      onClick={async () => {
+                        setDownloadingOllamaModel(model.name);
+                        try {
+                          await (window as any).magicWindow?.downloadOllama?.(model.name);
+                        } finally {
+                          window.setTimeout(() => setDownloadingOllamaModel(null), 1200);
+                        }
+                      }}
+                      className="shrink-0 rounded-lg bg-cyan-400 px-2 py-1.5 text-[10px] font-semibold text-cyan-950 hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-50"
+                    >
+                      {downloadingOllamaModel === model.name ? "Opening..." : "Download"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[9px] text-slate-500">Downloads run in a minimized Command Prompt from the same app directory used by Start Ollama. VRAM needs vary by quantization and context size.</p>
             </div>
             <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/70 p-3">
               <div className="flex items-center gap-2">

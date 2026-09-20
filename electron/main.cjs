@@ -12,6 +12,8 @@ let desktopKilled = false;
 let speechProcess = null;
 let speechWindow = null;
 let speechStopRequested = false;
+const ollamaWorkingDirectory = process.env.MAGIC_APP_ROOT || process.cwd();
+const supportedOllamaModels = new Set(["qwen2.5vl:3b", "llama3.2:3b", "minicpm-v"]);
 
 function stopWhisperSpeech() {
   speechStopRequested = true;
@@ -233,10 +235,25 @@ ipcMain.on("magic-window-close", (event) => {
 
 ipcMain.handle("magic-ollama-start", () => {
   const command = 'ollama run minicpm-v';
-  const child = spawn("cmd.exe", ["/c", "start", "", "/min", "cmd.exe", "/k", command], {
+  const child = spawn("cmd.exe", ["/c", "start", "", "/min", "cmd.exe", "/k", `cd /d "${ollamaWorkingDirectory}" && ${command}`], {
     windowsHide: false,
     detached: true,
     stdio: "ignore",
+    cwd: ollamaWorkingDirectory,
+  });
+  child.unref();
+  return true;
+});
+
+ipcMain.handle("magic-ollama-download", (_event, model) => {
+  if (typeof model !== "string" || !supportedOllamaModels.has(model)) {
+    throw new Error("That Ollama model is not available in the download menu.");
+  }
+  const child = spawn("cmd.exe", ["/c", "start", "", "/min", "cmd.exe", "/k", `cd /d "${ollamaWorkingDirectory}" && ollama pull ${model}`], {
+    windowsHide: false,
+    detached: true,
+    stdio: "ignore",
+    cwd: ollamaWorkingDirectory,
   });
   child.unref();
   return true;

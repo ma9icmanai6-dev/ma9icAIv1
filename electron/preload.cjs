@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("magicWindow", {
   setOverlayMode: (overlayMode) => ipcRenderer.send("magic-window-layout", overlayMode),
   close: () => ipcRenderer.send("magic-window-close"),
   startOllama: () => ipcRenderer.invoke("magic-ollama-start"),
+  downloadOllama: (model) => ipcRenderer.invoke("magic-ollama-download", model),
 });
 
 contextBridge.exposeInMainWorld("magicDesktop", {
