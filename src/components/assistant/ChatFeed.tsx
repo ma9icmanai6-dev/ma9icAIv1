@@ -46,19 +46,19 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
-        <div className="max-w-xl w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm shadow-xl">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-            <Sparkles className="w-6 h-6" />
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-2 text-center select-none overflow-y-auto">
+        <div className="max-w-xl w-full bg-slate-900/60 border border-slate-800 rounded-xl p-3 backdrop-blur-sm shadow-xl">
+          <div className="w-8 h-8 mx-auto mb-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <Sparkles className="w-4 h-4" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-100">Welcome to {assistantName}</h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <h2 className="text-sm font-semibold text-slate-100">Welcome to {assistantName}</h2>
+          <p className="text-[10px] text-slate-400 mt-1">
             Your personal multimodal voice companion. Speak naturally, ask me to examine your screen, or plan multi-step workflows.
           </p>
 
-          <div className="mt-5 text-left">
-            <span className="text-[11px] font-medium tracking-wider text-slate-400 uppercase">Try asking:</span>
-            <div className="mt-2 space-y-2">
+          <div className="mt-2 text-left">
+            <span className="text-[9px] font-medium tracking-wider text-slate-400 uppercase">Try asking:</span>
+            <div className="mt-1 space-y-1">
               {[
                 {
                   label: "Examine my screen",
@@ -84,7 +84,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({
                 <button
                   key={idx}
                   onClick={() => onQuickPrompt(item.prompt)}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 text-xs text-slate-200 transition-colors group cursor-pointer text-left"
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 text-[10px] text-slate-200 transition-colors group cursor-pointer text-left"
                 >
                   <span className="flex items-center gap-2.5">
                     {item.icon}

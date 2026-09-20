@@ -764,28 +764,28 @@ export default function App() {
       </div>
 
       {/* Top Header Bar */}
-      <header className={`relative z-10 shrink-0 h-14 px-3 sm:px-4 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-center`}>
+      <header className={`relative z-10 shrink-0 h-12 px-2 sm:px-3 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-center`}>
         <div className="w-full max-w-lg flex items-center justify-between">
         {/* Brand & Identity */}
         <button
           type="button"
           onClick={() => setIsSettingsOpen(true)}
-          className="flex items-center gap-3 rounded-2xl p-1.5 text-left transition hover:bg-white/5"
+          className="flex items-center gap-2 rounded-xl p-1 text-left transition hover:bg-white/5"
           title="Open assistant settings"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">
-            <div className="w-full h-full rounded-[11px] bg-slate-950 flex items-center justify-center text-cyan-400">
-              <Sparkles className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">
+            <div className="w-full h-full rounded-[7px] bg-slate-950 flex items-center justify-center text-cyan-400">
+              <Sparkles className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-white tracking-tight">{assistantName || "Assistant"}</h1>
-              <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-medium text-indigo-300">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-sm font-semibold text-white tracking-tight">{assistantName || "Assistant"}</h1>
+              <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-medium text-indigo-300">
                 Assistant
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">Voice & Multimodal Intelligence</p>
+            <p className="text-[9px] text-slate-400">Voice & Multimodal Intelligence</p>
           </div>
         </button>
 
