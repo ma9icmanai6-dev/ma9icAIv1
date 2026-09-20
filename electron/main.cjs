@@ -4,6 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 
+app.commandLine.appendSwitch("enable-speech-input");
+app.commandLine.appendSwitch("enable-features", "WebSpeechAPI");
+
 const port = Number(process.env.MAGIC_PORT || 3210);
 let desktopPermission = "none";
 let desktopKilled = false;

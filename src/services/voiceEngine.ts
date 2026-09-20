@@ -113,6 +113,7 @@ export class VoiceEngine {
   private animFrameId: number | null = null;
   private isListening: boolean = false;
   private isSpeaking: boolean = false;
+  private recognitionRestartTimer: number | null = null;
   private settings: VoiceSettings;
   private callbacks: VoiceEngineCallbacks;
   private availableVoices: SpeechSynthesisVoice[] = [];
@@ -196,7 +197,9 @@ export class VoiceEngine {
       (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn("Web SpeechRecognition is not supported by this Electron runtime.");
+      const message = "Speech recognition is unavailable. Restart Magic AI and enable Windows Speech services.";
+      console.warn(message);
+      VoiceEngine.errorListeners.forEach((listener) => listener(message));
       return;
     }
 
@@ -269,7 +272,7 @@ export class VoiceEngine {
             : `Speech recognition error: ${event.error}`;
           this.callbacks.onError(message);
           VoiceEngine.errorListeners.forEach((listener) => listener(message));
-          if (["not-allowed", "service-not-allowed", "network", "audio-capture"].includes(event.error)) {
+          if (event.error === "not-allowed" || event.error === "audio-capture") {
             this.isListening = false;
             this.stopListening();
           }
@@ -278,11 +281,7 @@ export class VoiceEngine {
 
       this.recognition.onend = () => {
         if (this.isListening && this.settings.continuousListening) {
-          try {
-            this.recognition.start();
-          } catch {
-            // Restart silently
-          }
+          this.scheduleRecognitionRestart();
         }
       };
     } catch (err: any) {
@@ -293,8 +292,11 @@ export class VoiceEngine {
 
   public async startMicrophoneCapture() {
     try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        this.microphoneStream = await navigator.mediaDevices.getUserMedia({
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Microphone access is unavailable in this Electron build.");
+      }
+
+      this.microphoneStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
@@ -326,8 +328,7 @@ export class VoiceEngine {
           this.callbacks.onAudioLevel(normalized);
           this.animFrameId = requestAnimationFrame(updateAudioLevel);
         };
-        updateAudioLevel();
-      }
+      updateAudioLevel();
     } catch (err: any) {
       const message = err?.name === "NotAllowedError"
         ? "Microphone permission was denied. Allow microphone access for Magic AI."
@@ -339,16 +340,20 @@ export class VoiceEngine {
   }
 
   public async startListening() {
+    if (this.isListening) return;
     this.isListening = true;
     if (!this.recognition) {
       this.isListening = false;
-      throw new Error("Speech recognition is unavailable in this Electron build.");
+      throw new Error("Speech recognition is unavailable. Restart Magic AI and enable Windows Speech services.");
     }
     await this.startMicrophoneCapture();
     if (this.recognition) {
       try {
         this.recognition.start();
       } catch (e) {
+        if (e instanceof DOMException && e.name === "InvalidStateError") {
+          return;
+        }
         if (!(e instanceof DOMException) || e.name !== "InvalidStateError") {
           this.stopListening();
           throw new Error("Speech recognition could not start. Check the Windows speech service.");
@@ -359,6 +364,10 @@ export class VoiceEngine {
 
   public stopListening() {
     this.isListening = false;
+    if (this.recognitionRestartTimer !== null) {
+      window.clearTimeout(this.recognitionRestartTimer);
+      this.recognitionRestartTimer = null;
+    }
     if (this.recognition) {
       try {
         this.recognition.stop();
@@ -379,6 +388,24 @@ export class VoiceEngine {
       this.audioContext = null;
     }
     this.callbacks.onAudioLevel(0);
+  }
+
+  private scheduleRecognitionRestart() {
+    if (!this.isListening || !this.settings.continuousListening || this.recognitionRestartTimer !== null) {
+      return;
+    }
+
+    this.recognitionRestartTimer = window.setTimeout(() => {
+      this.recognitionRestartTimer = null;
+      if (!this.isListening || !this.recognition) return;
+      try {
+        this.recognition.start();
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "InvalidStateError")) {
+          this.scheduleRecognitionRestart();
+        }
+      }
+    }, 750);
   }
 
   public speak(text: string, onDone?: () => void): Promise<void> {

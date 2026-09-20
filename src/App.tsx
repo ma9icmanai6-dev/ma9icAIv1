@@ -611,11 +611,16 @@ export default function App() {
       setAudioLevel(lvl);
     });
     const unsubVoiceError = VoiceEngine.onError((message: string) => {
-      setIsListening(false);
-      setAssistantState("error");
       console.warn("Voice recognition stopped:", message);
       setVoiceNotice(message);
-      setAssistantState("idle");
+      const isPermanentVoiceError = /permission was denied|unavailable|audio-capture|could not be initialized/i.test(message);
+      if (isPermanentVoiceError) {
+        setIsListening(false);
+        setAssistantState("error");
+        setAssistantState("idle");
+      } else {
+        setAssistantState("listening");
+      }
     });
 
     return () => {
