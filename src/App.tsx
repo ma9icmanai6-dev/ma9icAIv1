@@ -50,6 +50,7 @@ export default function App() {
   const [experienceMode, setExperienceMode] = useState<"full" | "model">("full");
   const [showVisualStage, setShowVisualStage] = useState(false);
   const [modelConnected, setModelConnected] = useState(false);
+  const [aiConnected, setAiConnected] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const [activityText, setActivityText] = useState("");
   const [guiBlurred, setGuiBlurred] = useState(true);
@@ -82,6 +83,31 @@ export default function App() {
   useEffect(() => {
     (window as any).magicWindow?.setOverlayMode(experienceMode === "model");
   }, [experienceMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkAiConnection = async () => {
+      try {
+        const response = await fetch("/api/ai/config", { cache: "no-store" });
+        if (!response.ok) throw new Error(`AI status returned HTTP ${response.status}`);
+        const config = await response.json();
+        const providerReady = config.provider === "gemini"
+          ? Boolean(config.hasGeminiKey)
+          : Boolean(config.ollamaOnline || config.hasGeminiKey);
+        if (!cancelled) setAiConnected(providerReady);
+      } catch {
+        if (!cancelled) setAiConnected(false);
+      }
+    };
+
+    void checkAiConnection();
+    const timer = window.setInterval(checkAiConnection, 10000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (assistantState !== "processing" && assistantState !== "executing") {
@@ -759,14 +785,14 @@ export default function App() {
         <div className="flex items-center gap-1.5 pr-12 sm:gap-2">
           <div
             className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-medium ${
-              modelConnected
+              aiConnected
                 ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
                 : "border-rose-400/30 bg-rose-500/10 text-rose-300"
             }`}
-            title={modelConnected ? "3D model connected" : "3D model not connected"}
+            title={aiConnected ? "AI connected and confirmed" : "AI not connected"}
           >
-            <span className={`h-2 w-2 rounded-full ${modelConnected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-rose-500 shadow-[0_0_8px_#f43f5e]"}`} />
-            <span className="hidden sm:inline">{modelConnected ? "Model connected" : "Model not connected"}</span>
+            <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold tracking-tight ${aiConnected ? "bg-emerald-400 text-emerald-950 shadow-[0_0_8px_#34d399]" : "bg-rose-500 text-rose-950 shadow-[0_0_8px_#f43f5e]"}`}>AI</span>
+            <span className="hidden sm:inline">{aiConnected ? "AI confirmed" : "AI not connected"}</span>
           </div>
 
           {/* Model-only overlay mode */}
