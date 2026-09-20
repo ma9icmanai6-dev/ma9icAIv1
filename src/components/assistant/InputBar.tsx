@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Mic, MicOff, Send, Monitor, Camera, Sparkles, Loader2 } from "lucide-react";
+import { Mic, MicOff, Send, Monitor, Camera, MousePointer, User, Radio, Loader2 } from "lucide-react";
 import { AssistantState } from "../../types";
 
 interface InputBarProps {
@@ -8,6 +8,9 @@ interface InputBarProps {
   onToggleListening: () => void;
   onCaptureScreen: () => void;
   onCaptureCamera: () => void;
+  onTakeControl: () => void;
+  visualMode: "avatar" | "orb";
+  onVisualModeChange: (mode: "avatar" | "orb") => void;
   state: AssistantState;
   isAnalyzingVision?: boolean;
 }
@@ -18,6 +21,9 @@ export const InputBar: React.FC<InputBarProps> = ({
   onToggleListening,
   onCaptureScreen,
   onCaptureCamera,
+  onTakeControl,
+  visualMode,
+  onVisualModeChange,
   state,
   isAnalyzingVision = false,
 }) => {
@@ -64,19 +70,53 @@ export const InputBar: React.FC<InputBarProps> = ({
         </button>
 
         {[
-          "Magic",
+          "Take Control",
           "What can you do?",
           "Plan a project workflow",
           "Remember I prefer concise replies",
-        ].map((chip, idx) => (
-          <button
-            key={idx}
-            onClick={() => onSendMessage(chip)}
-            className="shrink-0 px-3 py-1.5 rounded-full bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
+        ].map((chip, idx) => chip === "Plan a project workflow" ? (
+          <div
+              key={idx}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-800 text-xs"
           >
-            {chip}
-          </button>
-        ))}
+              <span className="text-slate-500">View:</span>
+              <span className="inline-flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onVisualModeChange("avatar")}
+                  className={visualMode === "avatar" ? "text-sky-300" : "text-slate-400"}
+                  title="Show the 3D head"
+                >
+                  <User className="inline h-3.5 w-3.5" /> Head
+                </button>
+                <span className="text-slate-600">/</span>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onVisualModeChange("orb");
+                  }}
+                  className={visualMode === "orb" ? "text-sky-300" : "text-slate-400"}
+                  title="Show the voice orb"
+                >
+                  <Radio className="inline h-3.5 w-3.5" /> Orb
+                </button>
+              </span>
+            </div>
+          ) : (
+            <button
+              key={idx}
+              onClick={() => chip === "Take Control" ? onTakeControl() : onSendMessage(chip)}
+              className="shrink-0 px-3 py-1.5 rounded-full bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
+            >
+              {chip === "Take Control" ? (
+                <span className="inline-flex items-center gap-1.5 text-amber-200">
+                  <MousePointer className="h-3.5 w-3.5" />
+                  Take Control
+                </span>
+              ) : chip}
+            </button>
+          ))}
       </div>
 
       {/* Main Command Input Box */}

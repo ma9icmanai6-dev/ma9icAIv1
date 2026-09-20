@@ -24,17 +24,13 @@ import { TakeControlModal } from "./components/desktop/TakeControlModal";
 
 import {
   Sparkles,
-  Monitor,
   Camera,
-  Brain,
   Settings2,
   Trash2,
   Mic,
   Volume2,
   User,
-  Radio,
   X,
-  MousePointer,
 } from "lucide-react";
 
 function describeError(error: unknown, fallback: string): string {
@@ -726,26 +722,6 @@ export default function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Inspect Screen Button */}
-          <button
-            onClick={handleCaptureScreen}
-            disabled={isAnalyzingVision}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs text-cyan-300 transition-colors cursor-pointer disabled:opacity-50"
-            title="Examine Screen via Gemini Vision"
-          >
-            <Monitor className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Inspect Screen</span>
-          </button>
-
-          <button
-            onClick={() => setIsTakeControlOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/35 bg-amber-400/15 px-3 py-1.5 text-xs text-amber-200 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25"
-            title="Tell Magic to control the desktop"
-          >
-            <MousePointer className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Take Control</span>
-          </button>
-
           {/* Camera Button */}
           <button
             onClick={handleCaptureCamera}
@@ -755,49 +731,6 @@ export default function App() {
             <Camera className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Camera</span>
           </button>
-
-          {/* Memory Button */}
-          <button
-            onClick={() => setIsMemoryOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs text-amber-300 transition-colors cursor-pointer"
-            title="Long-Term Memories"
-          >
-            <Brain className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Memories</span>
-            {memories.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold flex items-center justify-center">
-                {memories.length}
-              </span>
-            )}
-          </button>
-
-          {/* View Mode Switcher: 3D Avatar Head vs Voice Orb */}
-          <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl">
-            <button
-              onClick={() => setVisualMode("avatar")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-                visualMode === "avatar"
-                  ? "bg-sky-500 text-white shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="3D Rigged Avatar Head (Reallusion CC4 / ARKit)"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">3D Head</span>
-            </button>
-            <button
-              onClick={() => setVisualMode("orb")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-                visualMode === "orb"
-                  ? "bg-sky-500 text-white shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="Luminous Voice Orb"
-            >
-              <Radio className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Orb</span>
-            </button>
-          </div>
 
           {/* Model-only overlay mode */}
           <button
@@ -892,6 +825,9 @@ export default function App() {
           onToggleListening={handleToggleListening}
           onCaptureScreen={handleCaptureScreen}
           onCaptureCamera={handleCaptureCamera}
+          onTakeControl={() => setIsTakeControlOpen(true)}
+          visualMode={visualMode}
+          onVisualModeChange={setVisualMode}
           state={assistantState}
           isAnalyzingVision={isAnalyzingVision}
         />
