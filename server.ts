@@ -52,6 +52,35 @@ function normalizeDesktopIntent(message: string, parsed: any) {
   const requestedApp = appAliases.find(([pattern]) => pattern.test(request))?.[1];
   const asksToOpen = /\b(open|launch|start|load|run)\b/.test(request);
   const fileMatch = message.match(/\b(?:open|load)\s+(?:the\s+)?file\s+["']?(.+?)["']?\s*$/i);
+  const browserSearchMatch = message.match(
+    /\b(?:in|using|with)\s+(edge|chrome|brave|firefox)\b[\s\S]*?\b(?:search|look\s+up|find)\s+(?:for\s+)?["']?(.+?)["']?\s*$/i
+  );
+
+  if (browserSearchMatch) {
+    const browser = browserSearchMatch[1].toLowerCase();
+    const query = browserSearchMatch[2].trim();
+    return {
+      ...parsed,
+      action: {
+        type: "MULTI_STEP_PLAN",
+        description: `Search for ${query} in ${browser}`,
+        multiStepPlan: {
+          planTitle: `Search for ${query}`,
+          spokenIntro: `I will open ${browser}, focus the address bar, enter ${query}, and submit the search.`,
+          steps: [
+            { stepNumber: 1, description: `Open ${browser}`, actionType: "LAUNCH_APP", params: { app: browser }, status: "pending", estimatedDurationMs: 1200 },
+            { stepNumber: 2, description: "Wait for the browser window", actionType: "WAIT", params: { ms: 1800 }, status: "pending", estimatedDurationMs: 1800 },
+            { stepNumber: 3, description: "Focus the browser address bar", actionType: "KEY_PRESS", params: { key: "^l" }, status: "pending", estimatedDurationMs: 200 },
+            { stepNumber: 4, description: `Type ${query}`, actionType: "TYPE_INPUT", params: { text: query }, status: "pending", estimatedDurationMs: 500 },
+            { stepNumber: 5, description: "Submit the search", actionType: "KEY_PRESS", params: { key: "~" }, status: "pending", estimatedDurationMs: 300 },
+          ],
+          spokenCompletion: `The search for ${query} has been submitted in ${browser}.`,
+          currentStepIndex: 0,
+          status: "idle",
+        },
+      },
+    };
+  }
 
   if (fileMatch && parsed?.action?.type !== "OPEN_FILE") {
     return {
@@ -74,6 +103,13 @@ function normalizeDesktopIntent(message: string, parsed: any) {
         parameter: requestedApp,
       },
     };
+  }
+  if (parsed?.action?.type === "MULTI_STEP_PLAN" && parsed.action.multiStepPlan) {
+    parsed.action.multiStepPlan.steps = parsed.action.multiStepPlan.steps.map((step: any) => ({
+      ...step,
+      params: step.params || {},
+      status: step.status || "pending",
+    }));
   }
   return parsed;
 }
@@ -369,6 +405,7 @@ Return ONLY valid JSON matching this structure:
 
         parsed = normalizeDesktopIntent(message, parsed);
 
+        parsed = normalizeDesktopIntent(message, parsed);
         const spoken = parsed.spokenResponse || parsed.spokenReply || "How can I assist you?";
         return res.json({
           ...parsed,
@@ -452,7 +489,7 @@ app.post("/api/vision/analyze", async (req, res) => {
     const prompt =
       req.body.prompt ||
       req.body.instruction ||
-      "Analyze what is currently visible on the screen. Identify open applications, active windows, buttons, menus, and text.";
+      "Analyze the screen in detail. Identify the active application, every visible window, browser address/search bars, buttons, tabs, menus, readable text, and likely clickable controls. Include screen coordinates for each actionable control.";
     if (!rawImage) {
       return res.status(400).json({ error: "imageBase64 or imageData is required" });
     }
@@ -465,10 +502,17 @@ Return structured JSON analysis in this exact format:
   "openWindows": ["List of open applications/windows/tabs identified"],
   "activeApplication": "Main window or focus area",
   "detectedElements": [
-    { "type": "button" | "input" | "menu" | "tab" | "text" | "window", "label": "label text", "location": "top-left" | "center" | "bottom-bar" | "modal" }
+    {
+      "type": "button" | "input" | "menu" | "tab" | "text" | "window",
+      "label": "label text",
+      "location": "top-left" | "center" | "bottom-bar" | "modal",
+      "boundingBox": { "x": 0, "y": 0, "width": 0, "height": 0 },
+      "center": { "x": 0, "y": 0 }
+    }
   ],
   "extractedText": "Key OCR text read from screen",
-  "suggestedActions": ["Action 1", "Action 2"]
+  "suggestedActions": ["Action 1", "Action 2"],
+  "details": "Detailed description of layout, application state, controls, and relevant text"
 }`;
 
     const useOllama = activeProvider === "ollama" || !process.env.GEMINI_API_KEY;

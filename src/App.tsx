@@ -115,7 +115,15 @@ export default function App() {
       WAIT: { action: "WAIT", params: { ms: params.ms || params.estimatedDurationMs || 500 } },
     };
     const mapped = actions[normalizedType];
-    if (!mapped || !(window as any).magicDesktop?.execute) return;
+    if (!mapped) throw new Error(`Unsupported desktop action: ${actionType}`);
+    if (!(window as any).magicDesktop?.execute) throw new Error("Desktop control is unavailable in this app window.");
+    if (["MOVE_MOUSE", "CLICK_BUTTON"].includes(normalizedType)) {
+      const x = mapped.params.x;
+      const y = mapped.params.y;
+      if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) {
+        throw new Error("This action needs screen coordinates. Ask Magic to inspect the screen first, then try again.");
+      }
+    }
     await (window as any).magicDesktop.execute(mapped.action, mapped.params);
   }, []);
 
