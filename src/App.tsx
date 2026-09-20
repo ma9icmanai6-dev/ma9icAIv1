@@ -780,7 +780,12 @@ export default function App() {
 
   return (
     <div
-      className={`w-screen h-screen overflow-hidden ${isDesktopShell ? "desktop-shell" : "bg-slate-950"} text-slate-100 flex items-center justify-center font-sans select-none relative`}
+      className={`w-screen h-screen overflow-hidden ${isDesktopShell ? "desktop-shell" : "bg-slate-950"} text-slate-100 flex flex-col font-sans select-none relative`}
+      style={
+        isDesktopShell && guiBlurred && experienceMode === "full"
+          ? { backgroundColor: "rgba(2, 6, 23, 0.4)", backdropFilter: "blur(18px)" }
+          : undefined
+      }
     >
       {experienceMode === "model" ? (
         <AvatarCanvas
@@ -803,12 +808,6 @@ export default function App() {
         />
       ) : (
         <>
-      <div
-        className={`assistant-panel relative flex h-[220px] w-[360px] flex-col overflow-hidden rounded-2xl border ${
-          guiBlurred ? "border-white/15" : "border-slate-700"
-        }`}
-        style={guiBlurred ? { backdropFilter: "blur(18px)" } : undefined}
-      >
       {/* Background ambient lighting */}
       <div className={`${isDesktopShell ? "hidden" : ""} absolute inset-0 pointer-events-none overflow-hidden`}>
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-indigo-600/10 rounded-full blur-3xl" />
@@ -1070,7 +1069,6 @@ export default function App() {
         thumbnailUrl={visionThumbnail}
         onActionClick={handleSendMessage}
       />
-      </div>
         </>
       )}
 
