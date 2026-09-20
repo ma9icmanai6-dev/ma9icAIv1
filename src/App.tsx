@@ -111,6 +111,7 @@ export default function App() {
       TYPE_INPUT: { action: "TYPE_TEXT", params: { text: params.text || params.parameter || "" } },
       KEY_PRESS: { action: "KEY_PRESS", params: { key: params.key || params.key_combination || params.parameter || "" } },
       LAUNCH_APP: { action: "LAUNCH_APP", params: { app: params.app || params.parameter || "notepad.exe" } },
+      NAVIGATE_URL: { action: "NAVIGATE_URL", params: { url: params.url || params.parameter || "" } },
       OPEN_FILE: { action: "OPEN_FILE", params: { path: params.path || params.parameter || "" } },
       WAIT: { action: "WAIT", params: { ms: params.ms || params.estimatedDurationMs || 500 } },
     };
@@ -122,6 +123,9 @@ export default function App() {
       const y = mapped.params.y;
       if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) {
         throw new Error("This action needs screen coordinates. Ask Magic to inspect the screen first, then try again.");
+      }
+      if (normalizedType === "NAVIGATE_URL" && !String(mapped.params.url).trim()) {
+        throw new Error("No URL was provided for navigation.");
       }
     }
     await (window as any).magicDesktop.execute(mapped.action, mapped.params);
@@ -421,6 +425,7 @@ export default function App() {
               content: m.content,
             })),
             memories: MemoryService.getMemories(),
+            visionContext: activeVision,
           }),
         });
 
@@ -502,7 +507,7 @@ export default function App() {
         setTimeout(() => setAssistantState("idle"), 3000);
       }
     },
-    [messages, executePlanSequence, handleCaptureScreen, permissionLevel, triggerMagicGreeting]
+    [messages, activeVision, executePlanSequence, handleCaptureScreen, permissionLevel, triggerMagicGreeting]
   );
 
   const handlePermissionGrant = useCallback((level: PermissionLevel) => {

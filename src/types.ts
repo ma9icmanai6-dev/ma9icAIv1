@@ -89,6 +89,7 @@ export interface VisionDetection {
   }>;
   extractedText: string;
   suggestedActions: string[];
+  details?: string;
 }
 
 export interface PluginItem {
@@ -136,4 +137,3 @@ export interface AIConfig {
   availableOllamaModels: OllamaModelInfo[];
   hasGeminiKey: boolean;
 }
-

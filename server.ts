@@ -55,6 +55,59 @@ function normalizeDesktopIntent(message: string, parsed: any) {
   const browserSearchMatch = message.match(
     /\b(?:in|using|with)\s+(edge|chrome|brave|firefox)\b[\s\S]*?\b(?:search|look\s+up|find)\s+(?:for\s+)?["']?(.+?)["']?\s*$/i
   );
+  const browserTypeMatch = message.match(
+    /\b(?:in|using|with)\s+(edge|chrome|brave|firefox)\b[\s\S]*?\b(?:type|enter|search)\s+(?:for\s+)?["']?(.+?)["']?(?:\s+and\s+(?:press|hit)\s+enter)?\s*$/i
+  );
+  const coordinateClickMatch = message.match(/\bclick\s+(?:at\s+)?(?:x\s*)?(\d{2,5})\s*(?:,|and)\s*(?:y\s*)?(\d{2,5})\b/i);
+
+  if (browserTypeMatch) {
+    const browser = browserTypeMatch[1].toLowerCase();
+    const query = browserTypeMatch[2].replace(/\s+(?:and\s+)?(?:press|hit)\s+enter\s*$/i, "").trim();
+    return {
+      ...parsed,
+      action: {
+        type: "MULTI_STEP_PLAN",
+        description: `Type ${query} in ${browser} and submit`,
+        multiStepPlan: {
+          planTitle: `Use ${browser} search`,
+          spokenIntro: `I will open ${browser}, focus its address bar, type ${query}, and press Enter.`,
+          steps: [
+            { stepNumber: 1, description: `Open ${browser}`, actionType: "LAUNCH_APP", params: { app: browser }, status: "pending", estimatedDurationMs: 1200 },
+            { stepNumber: 2, description: "Wait for the browser window", actionType: "WAIT", params: { ms: 1800 }, status: "pending", estimatedDurationMs: 1800 },
+            { stepNumber: 3, description: "Focus the browser address bar", actionType: "KEY_PRESS", params: { key: "^l" }, status: "pending", estimatedDurationMs: 200 },
+            { stepNumber: 4, description: `Type ${query}`, actionType: "TYPE_INPUT", params: { text: query }, status: "pending", estimatedDurationMs: 500 },
+            { stepNumber: 5, description: "Submit the search", actionType: "KEY_PRESS", params: { key: "~" }, status: "pending", estimatedDurationMs: 300 },
+          ],
+          spokenCompletion: `The search has been submitted in ${browser}.`,
+          currentStepIndex: 0,
+          status: "idle",
+        },
+      },
+    };
+  }
+
+  if (coordinateClickMatch) {
+    const x = Number(coordinateClickMatch[1]);
+    const y = Number(coordinateClickMatch[2]);
+    return {
+      ...parsed,
+      action: {
+        type: "MULTI_STEP_PLAN",
+        description: `Move to ${x}, ${y} and click`,
+        multiStepPlan: {
+          planTitle: "Click screen location",
+          spokenIntro: `I will move the mouse to ${x}, ${y} and click.`,
+          steps: [
+            { stepNumber: 1, description: `Move to ${x}, ${y}`, actionType: "MOVE_MOUSE", params: { x, y }, status: "pending", estimatedDurationMs: 600 },
+            { stepNumber: 2, description: "Click the selected location", actionType: "CLICK_BUTTON", params: { x, y }, status: "pending", estimatedDurationMs: 200 },
+          ],
+          spokenCompletion: "The selected location was clicked.",
+          currentStepIndex: 0,
+          status: "idle",
+        },
+      },
+    };
+  }
 
   if (browserSearchMatch) {
     const browser = browserSearchMatch[1].toLowerCase();
@@ -320,7 +373,7 @@ app.get("/api/health", async (_req, res) => {
 // Main Chat & Command Interpretation Endpoint
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, history = [], memories = [] } = req.body;
+    const { message, history = [], memories = [], visionContext = null } = req.body;
     if (!message) {
       return res.status(400).json({ error: "Message is required" });
     }
@@ -330,6 +383,9 @@ Persona: Composed, attentive, clear, proactive, and elegant.
 Voice response style: Concise, spoken-friendly, conversational, direct (under 40 words).
 
 User Stored Memories: ${JSON.stringify(memories)}
+Latest Screen Analysis: ${JSON.stringify(visionContext)}
+
+When the user asks you to click, move, type, or interact with something visible, use the latest screen analysis coordinates when available. Return a MULTI_STEP_PLAN with MOVE_MOUSE followed by CLICK_BUTTON, TYPE_INPUT, or KEY_PRESS. Never claim to have performed a desktop action unless you return an executable plan.
 
 When responding, you must provide:
 1. "spokenResponse": A concise, spoken companion reply to be spoken aloud.
@@ -405,6 +461,7 @@ Return ONLY valid JSON matching this structure:
 
         parsed = normalizeDesktopIntent(message, parsed);
 
+        parsed = normalizeDesktopIntent(message, parsed);
         parsed = normalizeDesktopIntent(message, parsed);
         const spoken = parsed.spokenResponse || parsed.spokenReply || "How can I assist you?";
         return res.json({
@@ -512,7 +569,7 @@ Return structured JSON analysis in this exact format:
   ],
   "extractedText": "Key OCR text read from screen",
   "suggestedActions": ["Action 1", "Action 2"],
-  "details": "Detailed description of layout, application state, controls, and relevant text"
+  "details": "Detailed description of layout, application state, controls, coordinates, and relevant text"
 }`;
 
     const useOllama = activeProvider === "ollama" || !process.env.GEMINI_API_KEY;

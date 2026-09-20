@@ -134,6 +134,14 @@ async function executeDesktopAction(action, params = {}) {
     if (desktopPermission === "one_action") desktopPermission = "none";
     return;
   }
+  if (action === "NAVIGATE_URL") {
+    const url = String(params.url || "").trim();
+    if (!/^https?:\/\//i.test(url)) throw new Error("Navigation requires an http or https URL.");
+    const errorMessage = await shell.openExternal(url);
+    if (errorMessage) throw new Error(`Could not open URL: ${errorMessage}`);
+    if (desktopPermission === "one_action") desktopPermission = "none";
+    return;
+  }
   const script = `
 Add-Type @'
 using System;
