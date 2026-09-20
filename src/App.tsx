@@ -926,6 +926,9 @@ export default function App() {
         thumbnailUrl={visionThumbnail}
         onActionClick={handleSendMessage}
       />
+        </>
+      )}
+
       <SuperAIPermissionDialog
         isOpen={isPermissionOpen}
         requestedActionDescription={pendingPlan?.planTitle || "A multi-step desktop control task"}
@@ -937,8 +940,6 @@ export default function App() {
         onClose={() => setIsTakeControlOpen(false)}
         onSubmit={handleTakeControl}
       />
-        </>
-      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+    <div className="pointer-events-auto fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
       <div className="w-full max-w-md bg-slate-900 border-2 border-amber-500/60 rounded-2xl shadow-2xl shadow-amber-500/10 overflow-hidden text-slate-100 animate-in fade-in zoom-in-95 duration-200">
         {/* Banner */}
         <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-500/15 border-b border-amber-500/20 text-amber-300">
@@ -67,7 +67,7 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
               onClick={() => onGrant("one_action")}
               className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold transition shadow-md"
             >
-              <span>Permit One Action Only</span>
+              <span>Accept and permit one action</span>
               <Check className="w-4 h-4" />
             </button>
             <button
@@ -75,7 +75,7 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
               onClick={() => onGrant("one_session")}
               className="w-full flex items-center justify-between px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition border border-white/10"
             >
-              <span>Permit This Session</span>
+              <span>Accept for this session</span>
               <span className="text-[10px] text-slate-400 font-mono">Until reload</span>
             </button>
             <button
@@ -83,7 +83,7 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
               onClick={() => onGrant("always")}
               className="w-full flex items-center justify-between px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition border border-white/10"
             >
-              <span>Always Allow</span>
+              <span>Accept and always allow</span>
               <span className="text-[10px] text-slate-400 font-mono">Full Trust</span>
             </button>
             <button

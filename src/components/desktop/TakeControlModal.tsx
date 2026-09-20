@@ -32,7 +32,7 @@ export const TakeControlModal: React.FC<TakeControlModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+    <div className="pointer-events-auto fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-lg overflow-hidden rounded-3xl border border-cyan-300/25 bg-slate-950/95 text-slate-100 shadow-2xl shadow-cyan-950/40"
@@ -83,7 +83,7 @@ export const TakeControlModal: React.FC<TakeControlModalProps> = ({
               Cancel
             </button>
             <button type="submit" disabled={!task.trim()} className="rounded-xl bg-cyan-400 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
-              Plan and request control
+              Accept task and request control
             </button>
           </div>
         </div>
