@@ -24,7 +24,6 @@ import { TakeControlModal } from "./components/desktop/TakeControlModal";
 
 import {
   Sparkles,
-  Camera,
   Settings2,
   Trash2,
   Mic,
@@ -355,7 +354,7 @@ export default function App() {
   }, []);
 
   // Trigger Magic's greeting when the user says "Magic" or clicks the orb
-  const triggerMagicGreeting = useCallback(() => {
+  const triggerMagicGreeting = useCallback((startListeningAfter = true) => {
     VoiceEngine.stopSpeaking();
 
     const greetings = [
@@ -386,7 +385,11 @@ export default function App() {
     setIsListening(false);
 
     VoiceEngine.speak(greetingText, () => {
-      // Once speaking finishes, immediately start listening for user's input
+      if (!startListeningAfter) {
+        setAssistantState("idle");
+        return;
+      }
+
       VoiceEngine.startListening()
         .then(() => {
           setVoiceNotice(null);
@@ -662,7 +665,7 @@ export default function App() {
   }, [handleSendMessage, triggerMagicGreeting]);
 
   useEffect(() => {
-    const greetingTimer = window.setTimeout(() => triggerMagicGreeting(), 900);
+    const greetingTimer = window.setTimeout(() => triggerMagicGreeting(false), 900);
     return () => window.clearTimeout(greetingTimer);
   }, [triggerMagicGreeting]);
 
@@ -701,7 +704,7 @@ export default function App() {
       </div>
 
       {/* Top Header Bar */}
-      <header className={`relative z-10 shrink-0 h-16 px-6 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-between`}>
+      <header className={`relative z-10 shrink-0 h-16 px-4 sm:px-6 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-between`}>
         {/* Brand & Identity */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">
@@ -721,17 +724,7 @@ export default function App() {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Camera Button */}
-          <button
-            onClick={handleCaptureCamera}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs text-purple-300 transition-colors cursor-pointer"
-            title="Camera Vision"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Camera</span>
-          </button>
-
+        <div className="flex items-center gap-1.5 pr-12 sm:gap-2">
           {/* Model-only overlay mode */}
           <button
             onClick={() => setExperienceMode("model")}
@@ -744,7 +737,7 @@ export default function App() {
           {isDesktopShell && (
             <button
               onClick={() => (window as any).magicWindow?.close()}
-              className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
               title="Close Magic AI"
             >
               <X className="w-4 h-4" />
@@ -788,7 +781,7 @@ export default function App() {
       </header>
 
       {/* Main Assistant Body */}
-      <main className="relative z-10 flex-1 min-h-0 flex flex-col max-w-4xl w-full mx-auto overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col max-w-2xl w-full mx-auto overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
         {/* Dynamic Visual Stage: 3D Rigged Head or Luminous Orb */}
         <div className="shrink-0 border-b border-slate-800/40 bg-gradient-to-b from-slate-950/40 to-transparent">
           {visualMode === "avatar" ? (

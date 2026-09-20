@@ -49,6 +49,14 @@ export const InputBar: React.FC<InputBarProps> = ({
       {/* Quick Suggestion Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none text-xs">
         <button
+          onClick={onCaptureCamera}
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-purple-300 transition-colors cursor-pointer"
+        >
+          <Camera className="w-3.5 h-3.5" />
+          <span>Camera Vision</span>
+        </button>
+
+        <button
           onClick={onCaptureScreen}
           disabled={isAnalyzingVision}
           className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-cyan-300 transition-colors cursor-pointer disabled:opacity-50"
@@ -59,14 +67,6 @@ export const InputBar: React.FC<InputBarProps> = ({
             <Monitor className="w-3.5 h-3.5" />
           )}
           <span>Inspect Screen</span>
-        </button>
-
-        <button
-          onClick={onCaptureCamera}
-          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-purple-300 transition-colors cursor-pointer"
-        >
-          <Camera className="w-3.5 h-3.5" />
-          <span>Camera Vision</span>
         </button>
 
         {[
