@@ -520,7 +520,6 @@ Return ONLY valid JSON matching this structure:
         }
 
         parsed = normalizeDesktopIntent(message, parsed, visionContext);
-        parsed = normalizeDesktopIntent(message, parsed, visionContext);
         const spoken = parsed.spokenResponse || parsed.spokenReply || "How can I assist you?";
         return res.json({
           ...parsed,

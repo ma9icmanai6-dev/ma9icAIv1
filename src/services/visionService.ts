@@ -2,6 +2,11 @@ import { VisionDetection } from "../types";
 
 export class VisionService {
   public static async captureScreen(): Promise<string> {
+    const nativeCapture = (window as any).magicDesktop?.captureScreen;
+    if (typeof nativeCapture === "function") {
+      return nativeCapture();
+    }
+
     try {
       return await this.captureRealDisplayMedia();
     } catch (err) {

@@ -184,6 +184,30 @@ ipcMain.on("desktop-control-permission", (_event, level) => {
 });
 
 ipcMain.handle("desktop-control-action", async (_event, action, params) => executeDesktopAction(action, params));
+ipcMain.handle("desktop-capture-screen", async (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const wasVisible = window && !window.isDestroyed() && window.isVisible();
+  if (wasVisible) {
+    window.hide();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+
+  try {
+    const display = screen.getPrimaryDisplay();
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: display.size.width, height: display.size.height },
+      fetchWindowIcons: false,
+    });
+    const source = sources.find((candidate) => candidate.display_id === String(display.id)) || sources[0];
+    if (!source || source.thumbnail.isEmpty()) {
+      throw new Error("Windows did not return a desktop screenshot.");
+    }
+    return `data:image/jpeg;base64,${source.thumbnail.toJPEG(60).toString("base64")}`;
+  } finally {
+    if (wasVisible && window && !window.isDestroyed()) window.show();
+  }
+});
 ipcMain.handle("magic-voice-start", (event) => {
   startWindowsSpeech(BrowserWindow.fromWebContents(event.sender));
   return true;

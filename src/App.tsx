@@ -231,7 +231,7 @@ export default function App() {
   );
 
   // Screen Capture & Multimodal Vision Analysis (Gemini Flash OCR)
-  const handleCaptureScreen = useCallback(async () => {
+  const handleCaptureScreen = useCallback(async (): Promise<VisionDetection | null> => {
     setIsAnalyzingVision(true);
     setAssistantState("processing");
     VoiceEngine.speak("Examining your screen right now.");
@@ -281,10 +281,12 @@ export default function App() {
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
+      return visionResult;
     } catch (err) {
       console.error("Screen capture error:", err);
       VoiceEngine.speak(`Screen inspection failed: ${describeError(err, "screen capture was cancelled or unavailable.")}`);
       setAssistantState("idle");
+      return null;
     } finally {
       setIsAnalyzingVision(false);
     }
@@ -397,7 +399,7 @@ export default function App() {
 
   // Send Message to Gemini Chat API
   const handleSendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, visionOverride?: VisionDetection | null) => {
       if (!text.trim()) return;
 
       // If user says/types purely "Magic" or "Hey Magic", trigger greeting
@@ -428,7 +430,7 @@ export default function App() {
               content: m.content,
             })),
             memories: MemoryService.getMemories(),
-            visionContext: activeVision,
+            visionContext: visionOverride ?? activeVision,
           }),
         });
 
@@ -522,6 +524,12 @@ export default function App() {
       executePlanSequence(plan);
     }
   }, [executePlanSequence, pendingPlan, setDesktopPermission]);
+
+  const handleTakeControl = useCallback(async (task: string) => {
+    setIsTakeControlOpen(false);
+    const screenContext = await handleCaptureScreen();
+    await handleSendMessage(task, screenContext);
+  }, [handleCaptureScreen, handleSendMessage]);
 
   const handlePermissionDeny = useCallback(() => {
     setDesktopPermission("deny");
@@ -919,10 +927,7 @@ export default function App() {
       <TakeControlModal
         isOpen={isTakeControlOpen}
         onClose={() => setIsTakeControlOpen(false)}
-        onSubmit={(task) => {
-          setIsTakeControlOpen(false);
-          handleSendMessage(task);
-        }}
+        onSubmit={handleTakeControl}
       />
         </>
       )}
