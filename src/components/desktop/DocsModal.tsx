@@ -26,8 +26,8 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-      <div className="w-full max-w-4xl h-[85vh] bg-slate-900 border border-white/20 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
+    <div className="desktop-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+      <div className="desktop-modal-panel w-full max-w-4xl h-[85vh] bg-slate-900 border border-white/20 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-slate-800/90 border-b border-white/10">
           <div className="flex items-center gap-2.5">

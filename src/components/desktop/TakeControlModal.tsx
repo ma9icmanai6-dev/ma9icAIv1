@@ -32,10 +32,10 @@ export const TakeControlModal: React.FC<TakeControlModalProps> = ({
   };
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+    <div className="desktop-modal-backdrop pointer-events-auto fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-lg overflow-hidden rounded-3xl border border-cyan-300/25 bg-slate-950/95 text-slate-100 shadow-2xl shadow-cyan-950/40"
+        className="desktop-modal-panel w-full max-w-lg overflow-hidden rounded-3xl border border-cyan-300/25 bg-slate-950/95 text-slate-100 shadow-2xl shadow-cyan-950/40"
       >
         <div className="flex items-start justify-between border-b border-white/10 px-5 py-4">
           <div className="flex gap-3">

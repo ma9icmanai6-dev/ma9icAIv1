@@ -27,3 +27,14 @@ body.desktop-shell #root {
 	background-color: transparent !important;
 	background-image: none !important;
 }
+
+/* Keep modal surfaces readable while the desktop shell stays transparent. */
+.desktop-shell .desktop-modal-backdrop {
+	background-color: rgba(2, 6, 23, 0.4) !important;
+	background-image: none !important;
+}
+
+.desktop-shell .desktop-modal-panel {
+	background-color: rgba(15, 23, 42, 0.6) !important;
+	background-image: none !important;
+}

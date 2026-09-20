@@ -18,8 +18,8 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
-      <div className="w-full max-w-md bg-slate-900 border-2 border-amber-500/60 rounded-2xl shadow-2xl shadow-amber-500/10 overflow-hidden text-slate-100 animate-in fade-in zoom-in-95 duration-200">
+    <div className="desktop-modal-backdrop pointer-events-auto fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+      <div className="desktop-modal-panel w-full max-w-md bg-slate-900 border-2 border-amber-500/60 rounded-2xl shadow-2xl shadow-amber-500/10 overflow-hidden text-slate-100 animate-in fade-in zoom-in-95 duration-200">
         {/* Banner */}
         <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-500/15 border-b border-amber-500/20 text-amber-300">
           <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
