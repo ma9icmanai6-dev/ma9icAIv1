@@ -36,8 +36,10 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
             onClick={onDeny}
             className="ml-auto rounded-lg p-1.5 text-amber-200/70 hover:bg-white/10 hover:text-white"
             title="Close permission dialog"
+            aria-label="Close permission dialog"
           >
             <X className="h-4 w-4" />
+            <span className="sr-only">X</span>
           </button>
         </div>
 
@@ -77,7 +79,7 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
               onClick={() => onGrant("one_action")}
               className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold transition shadow-md"
             >
-              <span>Accept</span>
+              <span className="font-bold">Accept</span>
               <span className="text-[10px] font-normal text-slate-800/70">One action</span>
               <Check className="w-4 h-4" />
             </button>

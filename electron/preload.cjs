@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("magicWindow", {
   moveBy: (deltaX, deltaY) => ipcRenderer.send("magic-window-move", deltaX, deltaY),
   setOverlayMode: (overlayMode) => ipcRenderer.send("magic-window-layout", overlayMode),
   close: () => ipcRenderer.send("magic-window-close"),
+  startOllama: () => ipcRenderer.invoke("magic-ollama-start"),
 });
 
 contextBridge.exposeInMainWorld("magicDesktop", {

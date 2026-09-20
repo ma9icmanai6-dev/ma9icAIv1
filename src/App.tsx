@@ -32,6 +32,8 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  Cpu,
+  Terminal,
 } from "lucide-react";
 
 function describeError(error: unknown, fallback: string): string {
@@ -51,6 +53,8 @@ export default function App() {
   const [showVisualStage, setShowVisualStage] = useState(false);
   const [modelConnected, setModelConnected] = useState(false);
   const [aiConnected, setAiConnected] = useState(false);
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
+  const [isStartingOllama, setIsStartingOllama] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const [activityText, setActivityText] = useState("");
   const [guiBlurred, setGuiBlurred] = useState(true);
@@ -760,7 +764,7 @@ export default function App() {
       </div>
 
       {/* Top Header Bar */}
-      <header className={`relative z-10 shrink-0 h-16 px-3 sm:px-4 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-center`}>
+      <header className={`relative z-10 shrink-0 h-14 px-3 sm:px-4 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-center`}>
         <div className="w-full max-w-lg flex items-center justify-between">
         {/* Brand & Identity */}
         <button
@@ -787,17 +791,20 @@ export default function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 pr-12 sm:gap-2">
-          <div
-            className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-medium ${
+          <button
+            type="button"
+            onClick={() => setIsModelMenuOpen(true)}
+            className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-medium cursor-pointer transition ${
               aiConnected
                 ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
                 : "border-rose-400/30 bg-rose-500/10 text-rose-300"
             }`}
-            title={aiConnected ? "AI connected and confirmed" : "AI not connected"}
+            title="Open AI model menu"
+            aria-label="Open AI model menu"
           >
             <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold tracking-tight ${aiConnected ? "bg-emerald-400 text-emerald-950 shadow-[0_0_8px_#34d399]" : "bg-rose-500 text-rose-950 shadow-[0_0_8px_#f43f5e]"}`}>AI</span>
             <span className="hidden sm:inline">{aiConnected ? "AI confirmed" : "AI not connected"}</span>
-          </div>
+          </button>
 
           {/* Model-only overlay mode */}
           <button
@@ -941,6 +948,58 @@ export default function App() {
         assistantName={assistantName}
         onAssistantNameChange={handleAssistantNameChange}
       />
+
+      {isModelMenuOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-cyan-400/30 bg-slate-950 p-4 text-slate-100 shadow-2xl shadow-cyan-950/40">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <Cpu className="h-5 w-5 text-cyan-300" />
+                <div>
+                  <h2 className="text-sm font-semibold text-white">AI model menu</h2>
+                  <p className="text-[11px] text-slate-400">{aiConnected ? "AI connected and confirmed" : "AI provider not connected"}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModelMenuOpen(false)}
+                className="flex items-center gap-1 rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs font-semibold text-rose-200 hover:bg-rose-500/25"
+                title="Close AI model menu"
+                aria-label="Close AI model menu"
+              >
+                <X className="h-4 w-4" />
+                <span>Close</span>
+              </button>
+            </div>
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/70 p-3">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-4 w-4 text-emerald-300" />
+                <div>
+                  <p className="text-xs font-semibold text-white">Start Ollama MiniCPM-V</p>
+                  <p className="mt-1 font-mono text-[10px] text-slate-400">ollama run minicpm-v</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isStartingOllama}
+                onClick={async () => {
+                  setIsStartingOllama(true);
+                  try {
+                    await (window as any).magicWindow?.startOllama?.();
+                  } finally {
+                    window.setTimeout(() => setIsStartingOllama(false), 1200);
+                  }
+                }}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Terminal className="h-4 w-4" />
+                {isStartingOllama ? "Opening Ollama..." : "Start Ollama"}
+              </button>
+              <p className="mt-2 text-[10px] text-slate-500">Opens a minimized Command Prompt window and runs the model command.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Memory Manager Modal */}
       <MemoryModal

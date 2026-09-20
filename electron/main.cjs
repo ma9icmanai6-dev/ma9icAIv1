@@ -231,6 +231,17 @@ ipcMain.on("magic-window-close", (event) => {
   BrowserWindow.fromWebContents(event.sender)?.close();
 });
 
+ipcMain.handle("magic-ollama-start", () => {
+  const command = 'ollama run minicpm-v';
+  const child = spawn("cmd.exe", ["/c", "start", "", "/min", "cmd.exe", "/k", command], {
+    windowsHide: false,
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+  return true;
+});
+
 ipcMain.on("magic-window-layout", (event, overlayMode) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window || typeof overlayMode !== "boolean") return;
@@ -247,12 +258,12 @@ ipcMain.on("magic-window-layout", (event, overlayMode) => {
       height,
     });
   } else {
-    window.setMinimumSize(480, 360);
+    window.setMinimumSize(480, 320);
     window.setBounds({
       x: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.width - 480) / 2)),
-      y: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.height - 400) / 2)),
+      y: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.height - 340) / 2)),
       width: 480,
-      height: 400,
+      height: 340,
     });
   }
 });
@@ -309,9 +320,9 @@ async function createWindow() {
 
   const window = new BrowserWindow({
     width: 480,
-    height: 400,
+    height: 340,
     minWidth: 480,
-    minHeight: 360,
+    minHeight: 320,
     transparent: true,
     frame: false,
     hasShadow: false,
