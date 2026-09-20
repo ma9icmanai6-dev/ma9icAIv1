@@ -123,6 +123,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const [isCustomModel, setIsCustomModel] = useState<boolean>(true);
   const [morphTargetNames, setMorphTargetNames] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [modelConnected, setModelConnected] = useState<boolean>(false);
   const [loadProgress, setLoadProgress] = useState<number | null>(null);
   const [showInspector, setShowInspector] = useState<boolean>(false);
   const [manualWeights, setManualWeights] = useState<Record<string, number>>({});
@@ -198,6 +199,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     setIsCustomModel(false);
     setMorphTargetNames(defaultAvatar.morphNames);
     setStatusMessage("Loaded procedural head with ARKit 52 morphs");
+    setModelConnected(true);
     setShowModelMenu(false);
   }, []);
 
@@ -209,6 +211,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     if (!targetScene) return;
 
     setIsLoading(true);
+    setModelConnected(false);
     setLoadProgress(null);
     const fileName = url.split("/").pop() || "3D Model";
     setStatusMessage(`Loading 3D model: ${fileName}...`);
@@ -238,8 +241,10 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       setIsCustomModel(true);
       setMorphTargetNames(loadedAvatar.morphNames);
       setStatusMessage(`Loaded ${displayName} (${loadedAvatar.morphNames.length} blendshapes active)`);
+      setModelConnected(true);
     } catch (err: any) {
       console.warn(`Failed to load 3D model from ${url}:`, err);
+      setModelConnected(false);
       setStatusMessage(`Failed to load ${fileName}: ${err.message || "Parse error"}. Falling back to procedural rig.`);
       loadDefaultHead(targetScene);
     } finally {
@@ -255,6 +260,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const loadCustomModelFile = useCallback(async (file: File) => {
     if (!sceneRef.current) return;
     setIsLoading(true);
+    setModelConnected(false);
     setLoadProgress(null);
     setStatusMessage(`Parsing 3D mesh and morph targets from ${file.name}...`);
 
@@ -282,12 +288,14 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       setStatusMessage(
         `Loaded ${file.name} (${loadedAvatar.morphNames.length} morph targets detected)`
       );
+      setModelConnected(true);
       frameAvatar(loadedAvatar.root, modelOnlyRef.current);
     } catch (err: any) {
       console.error("Error parsing 3D file:", err);
       setStatusMessage(
         `Failed to parse 3D file: ${err.message || "Invalid or unsupported file format"}`
       );
+      setModelConnected(false);
     } finally {
       setIsLoading(false);
       setLoadProgress(null);
@@ -794,10 +802,14 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
             className="flex items-center gap-2.5 bg-slate-900/85 hover:bg-slate-900 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg text-left transition group"
             title="Click to switch or load 3D models"
           >
-            <div
-              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                isSpeaking ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" : "bg-sky-400"
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                modelConnected
+                  ? "bg-emerald-400 shadow-[0_0_8px_#34d399]"
+                  : "bg-rose-500 shadow-[0_0_8px_#f43f5e]"
               }`}
+              title={modelConnected ? "Model connected" : "Model not connected"}
+              aria-label={modelConnected ? "Model connected" : "Model not connected"}
             />
             <div>
               <div className="text-xs font-semibold text-slate-100 flex items-center gap-1.5">
@@ -817,6 +829,9 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
                 {morphTargetNames.length > 0
                   ? `${morphTargetNames.length} blendshapes active`
                   : "Standard ARKit 52"}
+                <span className={modelConnected ? "ml-1.5 text-emerald-300" : "ml-1.5 text-rose-300"}>
+                  {modelConnected ? "Connected" : "Not connected"}
+                </span>
               </div>
             </div>
           </button>
