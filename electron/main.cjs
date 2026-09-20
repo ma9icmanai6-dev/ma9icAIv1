@@ -1,14 +1,103 @@
-const {app, BrowserWindow, ipcMain, screen} = require("electron");
+const {app, BrowserWindow, ipcMain, screen, desktopCapturer, session, globalShortcut} = require("electron");
+const {execFile} = require("child_process");
 const path = require("path");
 const http = require("http");
 
 const port = Number(process.env.MAGIC_PORT || 3210);
+let desktopPermission = "none";
+let desktopKilled = false;
+
+function runPowerShell(script, args = []) {
+  return new Promise((resolve, reject) => {
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script, ...args], { windowsHide: true }, (error, stdout, stderr) => {
+      if (error) reject(new Error(stderr.trim() || error.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
+async function executeDesktopAction(action, params = {}) {
+  if (desktopKilled || !["one_action", "one_session", "always"].includes(desktopPermission)) {
+    throw new Error("Desktop control is not permitted.");
+  }
+
+  const x = Number(params.x);
+  const y = Number(params.y);
+  if (action === "LAUNCH_APP") {
+    const aliases = {
+      brave: ["brave.exe", `${process.env.LOCALAPPDATA}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`, `${process.env.ProgramFiles}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`, `${process.env["ProgramFiles(x86)"]}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`],
+      edge: ["msedge.exe", `${process.env["ProgramFiles(x86)"]}\\Microsoft\\Edge\\Application\\msedge.exe`],
+      chrome: ["chrome.exe", `${process.env.ProgramFiles}\\Google\\Chrome\\Application\\chrome.exe`],
+      notepad: ["notepad.exe"],
+      calculator: ["calc.exe"],
+      paint: ["mspaint.exe"],
+      explorer: ["explorer.exe"],
+      files: ["explorer.exe"],
+      terminal: ["powershell.exe"],
+      powershell: ["powershell.exe"],
+      taskmgr: ["taskmgr.exe"],
+    };
+    const requested = String(params.app || "").trim().toLowerCase();
+    const candidates = aliases[requested] || [String(params.app || "")];
+    const launchScript = `
+$candidates = ConvertFrom-Json $args[0]
+$target = $candidates | Where-Object { $_ -and ((Test-Path $_) -or $_ -match '\\.exe$') } | Select-Object -First 1
+if (-not $target) { throw "Could not find application: $($candidates -join ', ')" }
+Start-Process -FilePath $target
+`;
+    await runPowerShell(launchScript, [JSON.stringify(candidates)]);
+    if (desktopPermission === "one_action") desktopPermission = "none";
+    return;
+  }
+  const script = `
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class MagicInput {
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+  public const uint LEFTDOWN=0x02, LEFTUP=0x04, RIGHTDOWN=0x08, RIGHTUP=0x10, KEYUP=0x02;
+}
+'@
+$action = $args[0]
+switch ($action) {
+  'MOVE_MOUSE' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]) }
+  'CLICK' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]); [MagicInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [MagicInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero) }
+  'RIGHT_CLICK' { [MagicInput]::SetCursorPos([int]$args[1], [int]$args[2]); [MagicInput]::mouse_event(8,0,0,0,[UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [MagicInput]::mouse_event(16,0,0,0,[UIntPtr]::Zero) }
+  'TYPE_TEXT' { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($args[1]) }
+  'KEY_PRESS' { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($args[1]) }
+  'WAIT' { Start-Sleep -Milliseconds ([int]$args[1]) }
+}`;
+
+  const actionArgs = [action, String(Number.isFinite(x) ? x : 0), String(Number.isFinite(y) ? y : 0), String(params.text || params.key || params.app || params.ms || "")];
+  const result = await runPowerShell(script, actionArgs);
+  if (desktopPermission === "one_action") desktopPermission = "none";
+  return result;
+}
 
 ipcMain.on("magic-window-move", (event, deltaX, deltaY) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return;
   const [x, y] = window.getPosition();
   window.setPosition(Math.round(x + deltaX), Math.round(y + deltaY));
+});
+
+ipcMain.on("desktop-control-permission", (_event, level) => {
+  if (["none", "one_action", "one_session", "always", "deny"].includes(level)) {
+    desktopPermission = level;
+    desktopKilled = level === "deny";
+  }
+});
+
+ipcMain.handle("desktop-control-action", async (_event, action, params) => executeDesktopAction(action, params));
+ipcMain.on("desktop-control-kill", () => {
+  desktopKilled = true;
+  desktopPermission = "none";
+});
+
+ipcMain.on("magic-window-close", (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.close();
 });
 
 ipcMain.on("magic-window-layout", (event, overlayMode) => {
@@ -62,7 +151,30 @@ async function createWindow() {
   process.env.PORT = String(port);
   require(path.join(app.getAppPath(), "dist", "server.cjs"));
 
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === "media" || permission === "notifications");
+  });
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    return permission === "media" || permission === "notifications";
+  });
+
+  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+    try {
+      const sources = await desktopCapturer.getSources({ types: ["screen"] });
+      const primarySource = sources.find((source) => source.display_id) || sources[0];
+      callback(primarySource ? { video: primarySource } : {});
+    } catch (error) {
+      console.error("Unable to select a desktop capture source:", error);
+      callback({});
+    }
+  });
+
   await waitForServer(`http://127.0.0.1:${port}/api/health`);
+
+  globalShortcut.register("CommandOrControl+Alt+Escape", () => {
+    desktopKilled = true;
+    desktopPermission = "none";
+  });
 
   const window = new BrowserWindow({
     width: 1440,
@@ -91,5 +203,6 @@ app.whenReady().then(createWindow).catch((error) => {
 });
 
 app.on("window-all-closed", () => {
+  globalShortcut.unregisterAll();
   if (process.platform !== "darwin") app.quit();
 });

@@ -21,6 +21,50 @@ let activeOllamaModel = process.env.OLLAMA_CHAT_MODEL || "minicpm-v:latest";
 let activeOllamaVisionModel = process.env.OLLAMA_VISION_MODEL || "minicpm-v:latest";
 let activeGeminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
+function describeOllamaError(error: any): string {
+  const message = String(error?.message || error || "Unknown Ollama error");
+  if (/ECONNREFUSED|fetch failed|127\.0\.0\.1:11434/i.test(message)) {
+    return "Ollama is not reachable at http://127.0.0.1:11434. Start Ollama, then try again.";
+  }
+  if (/404|not found|model .* not found/i.test(message)) {
+    return `The Ollama model is not installed. Run: ollama pull ${activeOllamaModel}`;
+  }
+  if (/timeout|timed out|abort/i.test(message)) {
+    return `The Ollama model took too long to respond (${activeOllamaModel}). Try again after the model is loaded.`;
+  }
+  return `Ollama failed with ${activeOllamaModel}: ${message}`;
+}
+
+function normalizeDesktopIntent(message: string, parsed: any) {
+  const request = message.toLowerCase();
+  const appAliases: Array<[RegExp, string]> = [
+    [/\b(brave|brave browser)\b/, "brave"],
+    [/\b(edge|microsoft edge)\b/, "edge"],
+    [/\b(chrome|google chrome)\b/, "chrome"],
+    [/\b(notepad)\b/, "notepad"],
+    [/\b(calculator|calc)\b/, "calculator"],
+    [/\b(paint|mspaint)\b/, "paint"],
+    [/\b(file explorer|explorer|files)\b/, "explorer"],
+    [/\b(task manager|taskmgr)\b/, "taskmgr"],
+    [/\b(power ?shell|terminal)\b/, "terminal"],
+  ];
+  const requestedApp = appAliases.find(([pattern]) => pattern.test(request))?.[1];
+  const asksToOpen = /\b(open|launch|start|load|run)\b/.test(request);
+
+  if (requestedApp && asksToOpen && parsed?.action?.type !== "LAUNCH_APP" && parsed?.action?.type !== "MULTI_STEP_PLAN") {
+    return {
+      ...parsed,
+      action: {
+        type: "LAUNCH_APP",
+        description: `Open ${requestedApp}`,
+        app: requestedApp,
+        parameter: requestedApp,
+      },
+    };
+  }
+  return parsed;
+}
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use("/models", express.static(path.join(APP_ROOT, "public", "models")));
@@ -244,9 +288,10 @@ When responding, you must provide:
 Possible action types:
 - "WEB_SEARCH": { "query": string }
 - "SCREEN_ANALYSIS": {}
+- "LAUNCH_APP": { "app": "brave" | "edge" | "chrome" | "notepad" | "calculator" | "paint" | "explorer" | "terminal" | "taskmgr" }
 - "REMEMBER": { "key": string, "value": string, "category": string }
 - "FORGET": { "key": string }
-- "MULTI_STEP_PLAN": { "planTitle": string, "spokenIntro": string, "steps": Array<{ "stepNumber": number, "description": string, "actionType": string, "parameter"?: string }>, "spokenCompletion": string }
+- "MULTI_STEP_PLAN": { "planTitle": string, "spokenIntro": string, "steps": Array<{ "stepNumber": number, "description": string, "actionType": "LAUNCH_APP" | "MOVE_MOUSE" | "CLICK_BUTTON" | "TYPE_INPUT" | "KEY_PRESS" | "WAIT", "params": { "app"?: string, "x"?: number, "y"?: number, "text"?: string, "key"?: string, "ms"?: number } }>, "spokenCompletion": string }
 - "NONE": null
 
 Return ONLY valid JSON matching this structure:
@@ -277,12 +322,20 @@ Return ONLY valid JSON matching this structure:
           },
         ];
 
-        const rawContent = await callOllamaChat({
-          model: activeOllamaModel,
-          systemPrompt,
-          messages: chatMessages,
-          formatJson: true,
-        });
+        let rawContent: string;
+        let lastChatError: any;
+        for (const model of [activeOllamaModel, "magic-assistant:latest", "minicpm-v:latest"].filter(
+          (model, index, models) => model && models.indexOf(model) === index
+        )) {
+          try {
+            rawContent = await callOllamaChat({ model, systemPrompt, messages: chatMessages, formatJson: true });
+            lastChatError = null;
+            break;
+          } catch (error) {
+            lastChatError = error;
+          }
+        }
+        if (lastChatError || !rawContent!) throw lastChatError || new Error("No Ollama chat response");
 
         let parsed: any;
         try {
@@ -300,6 +353,8 @@ Return ONLY valid JSON matching this structure:
           };
         }
 
+        parsed = normalizeDesktopIntent(message, parsed);
+
         const spoken = parsed.spokenResponse || parsed.spokenReply || "How can I assist you?";
         return res.json({
           ...parsed,
@@ -312,11 +367,11 @@ Return ONLY valid JSON matching this structure:
         console.warn("[Ollama] Local chat error:", ollamaErr.message);
         if (!process.env.GEMINI_API_KEY) {
           return res.json({
-            spokenResponse: "I am ready and listening. Please check that Ollama is active with the selected model.",
-            spokenReply: "I am ready and listening. Please check that Ollama is active with the selected model.",
+            spokenResponse: describeOllamaError(ollamaErr),
+            spokenReply: describeOllamaError(ollamaErr),
             action: { type: "NONE" },
             status: "idle",
-            warning: ollamaErr.message,
+            warning: describeOllamaError(ollamaErr),
           });
         }
         // Fall back to Gemini if available

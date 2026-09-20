@@ -14,6 +14,7 @@ export class VoiceEngine {
   private static transcriptListeners: Array<(t: string) => void> = [];
   private static wakeWordListeners: Array<(w: string) => void> = [];
   private static audioLevelListeners: Array<(lvl: number) => void> = [];
+  private static errorListeners: Array<(message: string) => void> = [];
 
   public static getInstance(): VoiceEngine {
     if (!this.instance) {
@@ -93,6 +94,13 @@ export class VoiceEngine {
     this.audioLevelListeners.push(cb);
     return () => {
       this.audioLevelListeners = this.audioLevelListeners.filter((l) => l !== cb);
+    };
+  }
+
+  public static onError(cb: (message: string) => void) {
+    this.errorListeners.push(cb);
+    return () => {
+      this.errorListeners = this.errorListeners.filter((listener) => listener !== cb);
     };
   }
 
@@ -188,7 +196,7 @@ export class VoiceEngine {
       (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn("Web SpeechRecognition is not natively supported in this browser.");
+      console.warn("Web SpeechRecognition is not supported by this Electron runtime.");
       return;
     }
 
@@ -254,7 +262,13 @@ export class VoiceEngine {
         // Ignore "no-speech" or "aborted" in continuous background mode
         if (event.error !== "no-speech" && event.error !== "aborted") {
           console.warn("Speech recognition error:", event.error);
-          this.callbacks.onError(`Speech error: ${event.error}`);
+          const message = event.error === "not-allowed"
+            ? "Microphone permission was denied. Allow microphone access for Magic AI in Windows settings."
+            : event.error === "network"
+            ? "Speech recognition needs the Windows speech service or an internet connection."
+            : `Speech recognition error: ${event.error}`;
+          this.callbacks.onError(message);
+          VoiceEngine.errorListeners.forEach((listener) => listener(message));
         }
       };
 
@@ -269,6 +283,7 @@ export class VoiceEngine {
       };
     } catch (err: any) {
       console.error("Failed to initialize speech recognition:", err);
+      VoiceEngine.errorListeners.forEach((listener) => listener("Speech recognition could not be initialized."));
     }
   }
 
@@ -310,20 +325,32 @@ export class VoiceEngine {
         updateAudioLevel();
       }
     } catch (err: any) {
-      console.warn("Microphone audio level capture warning:", err);
+      const message = err?.name === "NotAllowedError"
+        ? "Microphone permission was denied. Allow microphone access for Magic AI."
+        : `Microphone could not start: ${err?.message || "unknown microphone error"}`;
+      console.warn(message);
+      VoiceEngine.errorListeners.forEach((listener) => listener(message));
+      throw new Error(message);
     }
   }
 
   public async startListening() {
     this.isListening = true;
+    if (!this.recognition) {
+      this.isListening = false;
+      throw new Error("Speech recognition is unavailable in this Electron build.");
+    }
+    await this.startMicrophoneCapture();
     if (this.recognition) {
       try {
         this.recognition.start();
       } catch (e) {
-        // Already started
+        if (!(e instanceof DOMException) || e.name !== "InvalidStateError") {
+          this.stopListening();
+          throw new Error("Speech recognition could not start. Check the Windows speech service.");
+        }
       }
     }
-    await this.startMicrophoneCapture();
   }
 
   public stopListening() {

@@ -6,6 +6,7 @@ import {
   MultiStepPlan,
   VisionDetection,
   VoiceSettings,
+  PermissionLevel,
 } from "./types";
 import { VoiceEngine } from "./services/voiceEngine";
 import { VisionService } from "./services/visionService";
@@ -18,6 +19,7 @@ import { InputBar } from "./components/assistant/InputBar";
 import { VoiceSettingsModal } from "./components/assistant/VoiceSettingsModal";
 import { MemoryModal } from "./components/assistant/MemoryModal";
 import { VisionModal } from "./components/assistant/VisionModal";
+import { SuperAIPermissionDialog } from "./components/desktop/SuperAIPermissionDialog";
 
 import {
   Sparkles,
@@ -30,7 +32,13 @@ import {
   Volume2,
   User,
   Radio,
+  X,
 } from "lucide-react";
+
+function describeError(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message && message !== "[object Object]" ? message : fallback;
+}
 
 export default function App() {
   const isDesktopShell = new URLSearchParams(window.location.search).has("desktop");
@@ -41,6 +49,10 @@ export default function App() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [visualMode, setVisualMode] = useState<"avatar" | "orb">("avatar");
   const [experienceMode, setExperienceMode] = useState<"full" | "model">("full");
+  const [guiBlurred, setGuiBlurred] = useState(true);
+  const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>("none");
+  const [pendingPlan, setPendingPlan] = useState<MultiStepPlan | null>(null);
+  const [isPermissionOpen, setIsPermissionOpen] = useState(false);
 
   // Chat conversation
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -68,6 +80,27 @@ export default function App() {
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(VoiceEngine.getSettings());
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const setDesktopPermission = useCallback((level: PermissionLevel) => {
+    setPermissionLevel(level);
+    (window as any).magicDesktop?.setPermission(level);
+  }, []);
+
+  const executeDesktopAction = useCallback(async (actionType: string, params: Record<string, any> = {}) => {
+    const coordinates = params.coordinates || {};
+    const normalizedType = actionType.toUpperCase();
+    const actions: Record<string, { action: string; params: Record<string, any> }> = {
+      MOVE_MOUSE: { action: "MOVE_MOUSE", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y } },
+      CLICK_BUTTON: { action: "CLICK", params: { x: params.x ?? coordinates.x, y: params.y ?? coordinates.y } },
+      TYPE_INPUT: { action: "TYPE_TEXT", params: { text: params.text || params.parameter || "" } },
+      KEY_PRESS: { action: "KEY_PRESS", params: { key: params.key || params.key_combination || params.parameter || "" } },
+      LAUNCH_APP: { action: "LAUNCH_APP", params: { app: params.app || params.parameter || "notepad.exe" } },
+      WAIT: { action: "WAIT", params: { ms: params.ms || params.estimatedDurationMs || 500 } },
+    };
+    const mapped = actions[normalizedType];
+    if (!mapped || !(window as any).magicDesktop?.execute) return;
+    await (window as any).magicDesktop.execute(mapped.action, mapped.params);
+  }, []);
 
   // Handle Assistant Speech Output
   const handleSpeakText = useCallback((text: string) => {
@@ -112,8 +145,26 @@ export default function App() {
           })
         );
 
-        // Simulated asynchronous execution delay per step
-        await new Promise((r) => setTimeout(r, 900));
+        try {
+          await executeDesktopAction(plan.steps[i].actionType, {
+            ...plan.steps[i].params,
+            parameter: plan.steps[i].parameter,
+            coordinates: plan.steps[i].coordinates,
+            estimatedDurationMs: plan.steps[i].estimatedDurationMs,
+          });
+        } catch (error) {
+          const reason = describeError(error, "The desktop action did not complete.");
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.action?.multiStepPlan
+                ? { ...msg, action: { ...msg.action, multiStepPlan: { ...msg.action.multiStepPlan, status: "aborted", steps: msg.action.multiStepPlan.steps.map((step, index) => index === i ? { ...step, status: "failed" } : step) } } }
+                : msg
+            )
+          );
+          setAssistantState("error");
+          VoiceEngine.speak(`Desktop control stopped: ${reason}`, () => setAssistantState("idle"));
+          return;
+        }
 
         // Mark step completed
         setMessages((prev) =>
@@ -143,7 +194,7 @@ export default function App() {
         setAssistantState("idle");
       });
     },
-    []
+    [executeDesktopAction]
   );
 
   // Screen Capture & Multimodal Vision Analysis (Gemini Flash OCR)
@@ -199,7 +250,7 @@ export default function App() {
       ]);
     } catch (err) {
       console.error("Screen capture error:", err);
-      VoiceEngine.speak("Screen capture was cancelled or unavailable.");
+      VoiceEngine.speak(`Screen inspection failed: ${describeError(err, "screen capture was cancelled or unavailable.")}`);
       setAssistantState("idle");
     } finally {
       setIsAnalyzingVision(false);
@@ -257,7 +308,7 @@ export default function App() {
       ]);
     } catch (err) {
       console.error("Webcam error:", err);
-      VoiceEngine.speak("Camera access was not granted.");
+      VoiceEngine.speak(`Camera inspection failed: ${describeError(err, "camera access was not granted.")}`);
       setAssistantState("idle");
     } finally {
       setIsAnalyzingVision(false);
@@ -335,10 +386,10 @@ export default function App() {
         }
 
         if (!response.ok && !data?.spokenResponse) {
-          throw new Error("Chat request failed");
+          throw new Error(data?.error || `Chat server returned HTTP ${response.status}.`);
         }
 
-        const spokenText = data?.spokenResponse || data?.spokenReply || "I am here to help.";
+        const spokenText = data?.spokenResponse || data?.spokenReply || "The assistant returned no response. Check the Ollama connection and selected model.";
 
         const assistantMsg: ChatMessage = {
           id: `msg-asst-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -356,23 +407,70 @@ export default function App() {
         });
 
         // Handle specific actions if present
-        if (data.action?.type === "REMEMBER" && data.action.parameter) {
+        if (data.action?.type === "LAUNCH_APP") {
+          const appName = data.action.app || data.action.parameter || data.action.params?.app;
+          const plan: MultiStepPlan = {
+            id: `launch-${Date.now()}`,
+            planTitle: `Open ${appName || "application"}`,
+            spokenIntro: spokenText,
+            steps: [{
+              stepNumber: 1,
+              description: `Launch ${appName || "application"}`,
+              actionType: "LAUNCH_APP",
+              params: { app: appName },
+              status: "pending",
+              estimatedDurationMs: 1000,
+            }],
+            spokenCompletion: `${appName || "The application"} is open.`,
+            currentStepIndex: 0,
+            status: "idle",
+          };
+          if (permissionLevel === "none" || permissionLevel === "deny") {
+            setPendingPlan(plan);
+            setIsPermissionOpen(true);
+          } else {
+            executePlanSequence(plan);
+          }
+        } else if (data.action?.type === "REMEMBER" && data.action.parameter) {
           MemoryService.addMemory("Preference", data.action.parameter, "preference", "persistent");
           setMemories(MemoryService.getMemories());
         } else if (data.action?.type === "SCREEN_ANALYSIS") {
           handleCaptureScreen();
         } else if (data.action?.type === "MULTI_STEP_PLAN" && data.action.multiStepPlan) {
-          executePlanSequence(data.action.multiStepPlan);
+          const plan = data.action.multiStepPlan as MultiStepPlan;
+          if (permissionLevel === "none" || permissionLevel === "deny") {
+            setPendingPlan(plan);
+            setIsPermissionOpen(true);
+          } else {
+            executePlanSequence(plan);
+          }
         }
       } catch (err) {
         console.error("Chat error:", err);
         setAssistantState("error");
-        VoiceEngine.speak("I encountered an issue processing that. Please try again.");
+        VoiceEngine.speak(`Chat failed: ${describeError(err, "the assistant could not process that request.")}`);
         setTimeout(() => setAssistantState("idle"), 3000);
       }
     },
-    [messages, executePlanSequence, handleCaptureScreen]
+    [messages, executePlanSequence, handleCaptureScreen, permissionLevel, triggerMagicGreeting]
   );
+
+  const handlePermissionGrant = useCallback((level: PermissionLevel) => {
+    setDesktopPermission(level);
+    setIsPermissionOpen(false);
+    if (pendingPlan) {
+      const plan = pendingPlan;
+      setPendingPlan(null);
+      executePlanSequence(plan);
+    }
+  }, [executePlanSequence, pendingPlan, setDesktopPermission]);
+
+  const handlePermissionDeny = useCallback(() => {
+    setDesktopPermission("deny");
+    setPendingPlan(null);
+    setIsPermissionOpen(false);
+    VoiceEngine.speak("Desktop control was cancelled.");
+  }, [setDesktopPermission]);
 
   // Toggle Voice Listening
   const handleToggleListening = useCallback(() => {
@@ -381,9 +479,15 @@ export default function App() {
       setIsListening(false);
       setAssistantState("idle");
     } else {
-      VoiceEngine.startListening();
       setIsListening(true);
       setAssistantState("listening");
+      VoiceEngine.startListening().catch((error) => {
+        setIsListening(false);
+        setAssistantState("error");
+        VoiceEngine.speak(`Microphone unavailable: ${describeError(error, "check microphone permissions and Windows speech recognition.")}`, () => {
+          setAssistantState("idle");
+        });
+      });
     }
   }, [isListening]);
 
@@ -464,18 +568,31 @@ export default function App() {
     const unsubAudio = VoiceEngine.onAudioLevel((lvl: number) => {
       setAudioLevel(lvl);
     });
+    const unsubVoiceError = VoiceEngine.onError((message: string) => {
+      setIsListening(false);
+      setAssistantState("error");
+      VoiceEngine.speak(message, () => setAssistantState("idle"));
+    });
 
     return () => {
       cleanupVoices();
       unsubSpeech();
       unsubWake();
       unsubAudio();
+      unsubVoiceError();
       VoiceEngine.stopListening();
     };
   }, [handleSendMessage, triggerMagicGreeting]);
 
   return (
-    <div className={`w-screen h-screen overflow-hidden ${isDesktopShell ? "bg-transparent desktop-shell" : "bg-slate-950"} text-slate-100 flex flex-col font-sans select-none relative`}>
+    <div
+      className={`w-screen h-screen overflow-hidden ${isDesktopShell ? "desktop-shell" : "bg-slate-950"} text-slate-100 flex flex-col font-sans select-none relative`}
+      style={
+        isDesktopShell && guiBlurred && experienceMode === "full"
+          ? { backgroundColor: "rgba(2, 6, 23, 0.4)", backdropFilter: "blur(18px)" }
+          : undefined
+      }
+    >
       {experienceMode === "model" ? (
         <AvatarCanvas
           isSpeaking={assistantState === "speaking"}
@@ -484,6 +601,7 @@ export default function App() {
           onSpeakGreeting={triggerMagicGreeting}
           onToggleListening={handleToggleListening}
           onCaptureScreen={handleCaptureScreen}
+          onSendMessage={handleSendMessage}
           onQuickAction={handleModelQuickAction}
           onToggleFullView={() => setExperienceMode("full")}
           className="h-screen w-screen"
@@ -591,6 +709,30 @@ export default function App() {
             <User className="w-4 h-4" />
           </button>
 
+          {isDesktopShell && (
+            <button
+              onClick={() => (window as any).magicWindow?.close()}
+              className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
+              title="Close Magic AI"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
+          {isDesktopShell && (
+            <button
+              onClick={() => setGuiBlurred((current) => !current)}
+              className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                guiBlurred
+                  ? "bg-sky-500/20 border-sky-400/50 text-sky-200"
+                  : "bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-slate-700 text-slate-300"
+              }`}
+              title={guiBlurred ? "Use fully transparent background" : "Use 60% transparent blurred background"}
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Settings Button */}
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -684,6 +826,12 @@ export default function App() {
         vision={activeVision}
         thumbnailUrl={visionThumbnail}
         onActionClick={handleSendMessage}
+      />
+      <SuperAIPermissionDialog
+        isOpen={isPermissionOpen}
+        requestedActionDescription={pendingPlan?.planTitle || "A multi-step desktop control task"}
+        onGrant={handlePermissionGrant}
+        onDeny={handlePermissionDeny}
       />
         </>
       )}

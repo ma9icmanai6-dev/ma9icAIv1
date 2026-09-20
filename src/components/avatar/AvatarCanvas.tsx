@@ -30,6 +30,8 @@ import {
   Star,
   LayoutDashboard,
   Move,
+  Keyboard,
+  Send,
 } from "lucide-react";
 
 const STARTUP_MODEL_URL = "/api/models/nova.compressed.glb";
@@ -41,6 +43,7 @@ interface AvatarCanvasProps {
   onQuickAction?: (action: "todo" | "important" | "inspect") => void;
   onToggleListening?: () => void;
   onCaptureScreen?: () => void;
+  onSendMessage?: (text: string) => void;
   onToggleFullView?: () => void;
   modelOnly?: boolean;
   className?: string;
@@ -53,6 +56,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   onQuickAction,
   onToggleListening,
   onCaptureScreen,
+  onSendMessage,
   onToggleFullView,
   modelOnly = false,
   className = "",
@@ -112,6 +116,8 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const [showUrlDialog, setShowUrlDialog] = useState<boolean>(false);
   const [customUrlInput, setCustomUrlInput] = useState<string>("");
   const [morphSearchQuery, setMorphSearchQuery] = useState<string>("");
+  const [showModelInput, setShowModelInput] = useState(false);
+  const [modelInput, setModelInput] = useState("");
 
   useEffect(() => {
     modelOnlyRef.current = modelOnly;
@@ -596,6 +602,36 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       <div ref={containerRef} className="relative flex-1 w-full h-full cursor-grab active:cursor-grabbing" />
 
       {modelOnly && (
+        <div className={`absolute top-[20%] left-1/2 z-40 w-[min(360px,calc(100%-24px))] -translate-x-1/2 pointer-events-auto transition ${showModelInput ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!modelInput.trim()) return;
+              onSendMessage?.(modelInput.trim());
+              setModelInput("");
+              setShowModelInput(false);
+            }}
+            className="flex items-center gap-2 rounded-2xl border border-white/20 bg-slate-950/90 p-2 shadow-2xl backdrop-blur-xl"
+          >
+            <input
+              autoFocus={showModelInput}
+              value={modelInput}
+              onChange={(event) => setModelInput(event.target.value)}
+              placeholder="Talk to Magic..."
+              className="min-w-0 flex-1 bg-transparent px-2 text-xs text-white outline-none placeholder:text-slate-500"
+            />
+            <button
+              type="submit"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 text-white transition hover:brightness-125"
+              title="Send message"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
+
+      {modelOnly && (
         <div className="absolute inset-x-0 top-[27%] flex items-center justify-center gap-2 pointer-events-none z-40">
           <button
             onClick={onSpeakGreeting}
@@ -619,6 +655,13 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
             title="Scan desktop screen"
           >
             <Eye className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setShowModelInput((current) => !current)}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-blue-200/60 bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-white shadow-lg transition hover:brightness-125"
+            title="Type a message to Magic"
+          >
+            <Keyboard className="h-4 w-4" />
           </button>
           <button
             onClick={() => onQuickAction?.("todo")}
