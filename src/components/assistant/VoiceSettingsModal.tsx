@@ -81,7 +81,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
             >
               <option value="default">Auto-select British female (Recommended)</option>
               {availableVoices.map((v) => (
-                <option key={v.name} value={v.name}>
+                <option key={`${v.name}-${v.lang}-${v.voiceURI}`} value={v.name}>
                   {v.name} ({v.lang})
                 </option>
               ))}

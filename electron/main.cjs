@@ -247,12 +247,12 @@ ipcMain.on("magic-window-layout", (event, overlayMode) => {
       height,
     });
   } else {
-    window.setMinimumSize(544, 420);
+    window.setMinimumSize(480, 360);
     window.setBounds({
-      x: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.width - 544) / 2)),
-      y: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.height - 450) / 2)),
-      width: 544,
-      height: 450,
+      x: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.width - 480) / 2)),
+      y: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.height - 400) / 2)),
+      width: 480,
+      height: 400,
     });
   }
 });
@@ -308,10 +308,10 @@ async function createWindow() {
   });
 
   const window = new BrowserWindow({
-    width: 544,
-    height: 450,
-    minWidth: 544,
-    minHeight: 420,
+    width: 480,
+    height: 400,
+    minWidth: 480,
+    minHeight: 360,
     transparent: true,
     frame: false,
     hasShadow: false,

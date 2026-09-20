@@ -662,7 +662,11 @@ export default function App() {
         const engineVoices = VoiceEngine.getVoices();
         const browserVoices = window.speechSynthesis.getVoices();
         const voices = [...engineVoices, ...browserVoices].filter(
-          (voice, index, all) => all.findIndex((candidate) => candidate.name === voice.name) === index
+          (voice, index, all) => all.findIndex((candidate) =>
+            candidate.name === voice.name &&
+            candidate.lang === voice.lang &&
+            candidate.voiceURI === voice.voiceURI
+          ) === index
         );
         if (voices.length > 0) setAvailableVoices(voices);
       };
@@ -812,15 +816,14 @@ export default function App() {
             {showVisualStage ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
 
-          {isDesktopShell && (
-            <button
-              onClick={() => (window as any).magicWindow?.close()}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
-              title={`Close ${assistantName}`}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={() => (window as any).magicWindow?.close()}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-30 p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
+            title={`Close ${assistantName}`}
+            aria-label={`Close ${assistantName}`}
+          >
+            <X className="w-4 h-4" />
+          </button>
 
           {isDesktopShell && (
             <button

@@ -77,7 +77,8 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
               onClick={() => onGrant("one_action")}
               className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold transition shadow-md"
             >
-              <span>Accept and permit one action</span>
+              <span>Accept</span>
+              <span className="text-[10px] font-normal text-slate-800/70">One action</span>
               <Check className="w-4 h-4" />
             </button>
             <button
