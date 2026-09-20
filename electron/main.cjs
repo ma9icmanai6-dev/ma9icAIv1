@@ -10,6 +10,77 @@ app.commandLine.appendSwitch("enable-features", "WebSpeechAPI");
 const port = Number(process.env.MAGIC_PORT || 3210);
 let desktopPermission = "none";
 let desktopKilled = false;
+let speechProcess = null;
+let speechWindow = null;
+
+function stopWindowsSpeech() {
+  if (speechProcess) {
+    speechProcess.kill();
+    speechProcess = null;
+  }
+}
+
+function startWindowsSpeech(window) {
+  stopWindowsSpeech();
+  speechWindow = window;
+
+  const script = `
+Add-Type -AssemblyName System.Speech
+$engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine
+$engine.SetInputToDefaultAudioDevice()
+$engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
+Register-ObjectEvent -InputObject $engine -EventName SpeechRecognized -Action {
+  $result = $EventArgs.Result
+  [Console]::WriteLine(("TRANSCRIPT|" + $result.Text + "|" + $result.Confidence.ToString([Globalization.CultureInfo]::InvariantCulture)))
+  [Console]::Out.Flush()
+} | Out-Null
+$engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
+while ($true) { Start-Sleep -Milliseconds 500 }
+`;
+
+  speechProcess = spawn("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-Command",
+    script,
+  ], { windowsHide: true });
+
+  let output = "";
+  speechProcess.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+    const lines = output.split(/\r?\n/);
+    output = lines.pop() || "";
+    for (const line of lines) {
+      const [kind, text, confidence] = line.split("|");
+      if (kind === "TRANSCRIPT" && text && speechWindow && !speechWindow.isDestroyed()) {
+        speechWindow.webContents.send("magic-voice-transcript", {
+          text,
+          confidence: Number(confidence) || 0.8,
+        });
+      }
+    }
+  });
+
+  speechProcess.stderr.on("data", (chunk) => {
+    const message = chunk.toString().trim();
+    if (message && speechWindow && !speechWindow.isDestroyed()) {
+      speechWindow.webContents.send("magic-voice-error", message);
+    }
+  });
+
+  speechProcess.once("error", (error) => {
+    if (speechWindow && !speechWindow.isDestroyed()) {
+      speechWindow.webContents.send("magic-voice-error", error.message);
+    }
+    speechProcess = null;
+  });
+
+  speechProcess.once("exit", () => {
+    speechProcess = null;
+  });
+}
 
 function runPowerShell(script, args = []) {
   return new Promise((resolve, reject) => {
@@ -105,6 +176,11 @@ ipcMain.on("desktop-control-permission", (_event, level) => {
 });
 
 ipcMain.handle("desktop-control-action", async (_event, action, params) => executeDesktopAction(action, params));
+ipcMain.handle("magic-voice-start", (event) => {
+  startWindowsSpeech(BrowserWindow.fromWebContents(event.sender));
+  return true;
+});
+ipcMain.on("magic-voice-stop", () => stopWindowsSpeech());
 ipcMain.on("desktop-control-kill", () => {
   desktopKilled = true;
   desktopPermission = "none";
@@ -217,6 +293,7 @@ app.whenReady().then(createWindow).catch((error) => {
 });
 
 app.on("window-all-closed", () => {
+  stopWindowsSpeech();
   globalShortcut.unregisterAll();
   if (process.platform !== "darwin") app.quit();
 });

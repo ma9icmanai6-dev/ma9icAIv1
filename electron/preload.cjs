@@ -11,3 +11,18 @@ contextBridge.exposeInMainWorld("magicDesktop", {
   execute: (action, params) => ipcRenderer.invoke("desktop-control-action", action, params),
   emergencyStop: () => ipcRenderer.send("desktop-control-kill"),
 });
+
+contextBridge.exposeInMainWorld("magicVoice", {
+  start: () => ipcRenderer.invoke("magic-voice-start"),
+  stop: () => ipcRenderer.send("magic-voice-stop"),
+  onTranscript: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("magic-voice-transcript", listener);
+    return () => ipcRenderer.removeListener("magic-voice-transcript", listener);
+  },
+  onError: (callback) => {
+    const listener = (_event, message) => callback(message);
+    ipcRenderer.on("magic-voice-error", listener);
+    return () => ipcRenderer.removeListener("magic-voice-error", listener);
+  },
+});

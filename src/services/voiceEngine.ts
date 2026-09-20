@@ -1,6 +1,17 @@
 import { VoiceSettings } from "../types";
 import { LipSyncEngine } from "./lipSyncEngine";
 
+declare global {
+  interface Window {
+    magicVoice?: {
+      start: () => Promise<boolean>;
+      stop: () => void;
+      onTranscript: (callback: (payload: { text: string; confidence: number }) => void) => () => void;
+      onError: (callback: (message: string) => void) => () => void;
+    };
+  }
+}
+
 export interface VoiceEngineCallbacks {
   onTranscript: (text: string, isFinal: boolean, confidence: number) => void;
   onWakeWordDetected: (phrase: string) => void;
@@ -114,6 +125,9 @@ export class VoiceEngine {
   private isListening: boolean = false;
   private isSpeaking: boolean = false;
   private recognitionRestartTimer: number | null = null;
+  private nativeSpeechActive = false;
+  private nativeSpeechCleanup: (() => void) | null = null;
+  private nativeFallbackAttempted = false;
   private settings: VoiceSettings;
   private callbacks: VoiceEngineCallbacks;
   private availableVoices: SpeechSynthesisVoice[] = [];
@@ -197,9 +211,7 @@ export class VoiceEngine {
       (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      const message = "Speech recognition is unavailable. Restart Magic AI and enable Windows Speech services.";
-      console.warn(message);
-      VoiceEngine.errorListeners.forEach((listener) => listener(message));
+      console.warn("Browser speech recognition unavailable; using Windows speech fallback.");
       return;
     }
 
@@ -272,6 +284,18 @@ export class VoiceEngine {
             : `Speech recognition error: ${event.error}`;
           this.callbacks.onError(message);
           VoiceEngine.errorListeners.forEach((listener) => listener(message));
+          if (["network", "service-not-allowed"].includes(event.error) && this.isListening && !this.nativeFallbackAttempted) {
+            this.nativeFallbackAttempted = true;
+            try {
+              this.recognition.stop();
+            } catch {
+              // Recognition is already ending.
+            }
+            this.startNativeSpeechFallback().catch((fallbackError) => {
+              this.isListening = false;
+              VoiceEngine.errorListeners.forEach((listener) => listener(fallbackError.message));
+            });
+          }
           if (event.error === "not-allowed" || event.error === "audio-capture") {
             this.isListening = false;
             this.stopListening();
@@ -342,11 +366,12 @@ export class VoiceEngine {
   public async startListening() {
     if (this.isListening) return;
     this.isListening = true;
-    if (!this.recognition) {
-      this.isListening = false;
-      throw new Error("Speech recognition is unavailable. Restart Magic AI and enable Windows Speech services.");
-    }
+    this.nativeFallbackAttempted = false;
     await this.startMicrophoneCapture();
+    if (!this.recognition) {
+      await this.startNativeSpeechFallback();
+      return;
+    }
     if (this.recognition) {
       try {
         this.recognition.start();
@@ -364,6 +389,7 @@ export class VoiceEngine {
 
   public stopListening() {
     this.isListening = false;
+    this.stopNativeSpeechFallback();
     if (this.recognitionRestartTimer !== null) {
       window.clearTimeout(this.recognitionRestartTimer);
       this.recognitionRestartTimer = null;
@@ -388,6 +414,65 @@ export class VoiceEngine {
       this.audioContext = null;
     }
     this.callbacks.onAudioLevel(0);
+  }
+
+  private async startNativeSpeechFallback() {
+    if (!window.magicVoice) {
+      this.stopListening();
+      throw new Error("Speech recognition is unavailable. Enable Windows Speech services and restart Magic AI.");
+    }
+
+    try {
+      this.nativeSpeechCleanup = window.magicVoice.onTranscript(({ text, confidence }) => {
+        if (this.isSpeaking || !this.isListening) return;
+        this.processRecognizedText(text, true, confidence);
+      });
+      const nativeErrorCleanup = window.magicVoice.onError((message) => {
+        if (this.isListening) {
+          VoiceEngine.errorListeners.forEach((listener) => listener(`Windows speech service: ${message}`));
+        }
+      });
+      const existingCleanup = this.nativeSpeechCleanup;
+      this.nativeSpeechCleanup = () => {
+        existingCleanup?.();
+        nativeErrorCleanup();
+      };
+      await window.magicVoice.start();
+      this.nativeSpeechActive = true;
+    } catch (error) {
+      this.stopNativeSpeechFallback();
+      this.stopListening();
+      throw new Error(`Windows speech recognition could not start: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private stopNativeSpeechFallback() {
+    if (this.nativeSpeechActive || this.nativeSpeechCleanup) {
+      window.magicVoice?.stop();
+    }
+    this.nativeSpeechCleanup?.();
+    this.nativeSpeechCleanup = null;
+    this.nativeSpeechActive = false;
+  }
+
+  private processRecognizedText(text: string, isFinal: boolean, confidence: number) {
+    const activeText = text.trim();
+    if (!activeText) return;
+
+    const isPureWakeWord = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[!?.,]*\s*$/i.test(activeText);
+    if (isPureWakeWord) {
+      this.callbacks.onWakeWordDetected(activeText);
+      return;
+    }
+
+    const wakeWordPrefixRegex = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[,:\s]+(.+)$/i;
+    const match = activeText.match(wakeWordPrefixRegex);
+    if (match) {
+      this.callbacks.onTranscript(match[2].trim(), isFinal, confidence);
+      return;
+    }
+
+    this.callbacks.onTranscript(activeText, isFinal, confidence);
   }
 
   private scheduleRecognitionRestart() {
