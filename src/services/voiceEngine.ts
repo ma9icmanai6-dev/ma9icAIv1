@@ -9,6 +9,7 @@ declare global {
       onReady?: (callback: () => void) => () => void;
       onTranscript: (callback: (payload: { text: string; confidence: number }) => void) => () => void;
       onError: (callback: (message: string) => void) => () => void;
+      onLevel?: (callback: (level: number) => void) => () => void;
     };
   }
 }
@@ -122,6 +123,9 @@ export class VoiceEngine {
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private microphoneStream: MediaStream | null = null;
+  private audioRecorder: MediaRecorder | null = null;
+  private recordedAudioChunks: Blob[] = [];
+  private cloudCorrectionInFlight = false;
   private animFrameId: number | null = null;
   private isListening: boolean = false;
   private isSpeaking: boolean = false;
@@ -212,7 +216,7 @@ export class VoiceEngine {
       (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn("Browser speech recognition unavailable; using Windows speech fallback.");
+      console.warn("Browser speech recognition unavailable; using Whisper fallback.");
       return;
     }
 
@@ -281,7 +285,7 @@ export class VoiceEngine {
           const message = event.error === "not-allowed"
             ? "Microphone permission was denied. Allow microphone access for Magic AI in Windows settings."
             : event.error === "network"
-            ? "Speech recognition needs the Windows speech service or an internet connection."
+            ? "Speech recognition needs the Whisper service or an internet connection."
             : `Speech recognition error: ${event.error}`;
           this.callbacks.onError(message);
           VoiceEngine.errorListeners.forEach((listener) => listener(message));
@@ -332,6 +336,7 @@ export class VoiceEngine {
         const AudioContextClass =
           window.AudioContext || (window as any).webkitAudioContext;
         this.audioContext = new AudioContextClass();
+        this.startAudioBuffer(this.microphoneStream);
         const source = this.audioContext.createMediaStreamSource(
           this.microphoneStream
         );
@@ -348,6 +353,7 @@ export class VoiceEngine {
           for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
           }
+
           const average = sum / dataArray.length;
           const normalized = Math.min(1, average / 128);
           this.callbacks.onAudioLevel(normalized);
@@ -364,6 +370,60 @@ export class VoiceEngine {
     }
   }
 
+  private startAudioBuffer(stream: MediaStream) {
+    if (typeof MediaRecorder === "undefined") return;
+    try {
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      this.recordedAudioChunks = [];
+      this.audioRecorder = new MediaRecorder(stream, { mimeType });
+      this.audioRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.recordedAudioChunks.push(event.data);
+          if (this.recordedAudioChunks.length > 12) this.recordedAudioChunks.shift();
+        }
+      };
+      this.audioRecorder.start(1000);
+    } catch (error) {
+      console.warn("Voice correction buffer unavailable:", error);
+      this.audioRecorder = null;
+    }
+  }
+
+  private async requestCloudCorrection(_localText: string, confidence: number): Promise<boolean> {
+    if (this.cloudCorrectionInFlight || !this.isListening || confidence >= 0.72 || this.recordedAudioChunks.length === 0) {
+      return false;
+    }
+
+    this.cloudCorrectionInFlight = true;
+    try {
+      const blob = new Blob(this.recordedAudioChunks, { type: this.audioRecorder?.mimeType || "audio/webm" });
+      const audioBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("Could not read recorded audio."));
+        reader.readAsDataURL(blob);
+      });
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioBase64, mimeType: blob.type || "audio/webm" }),
+      });
+      if (!response.ok) return false;
+      const result = await response.json();
+      const correctedText = typeof result.text === "string" ? result.text.trim() : "";
+      if (!result.available || !correctedText) return false;
+      this.processRecognizedText(correctedText, true, Number(result.confidence) || 0.9);
+      return true;
+    } catch (error) {
+      console.warn("Cloud voice correction unavailable:", error);
+      return false;
+    } finally {
+      this.cloudCorrectionInFlight = false;
+    }
+  }
+
   public async startListening() {
     if (this.isListening) return;
     this.isListening = true;
@@ -373,12 +433,6 @@ export class VoiceEngine {
     // builds. Prefer the native Windows recognizer when the IPC bridge exists.
     if (window.magicVoice) {
       await this.startNativeSpeechFallback();
-      try {
-        await this.startMicrophoneCapture();
-      } catch (error) {
-        // Native recognition owns the microphone; the analyser is only for UI.
-        console.warn("Audio level meter unavailable:", error);
-      }
       return;
     }
 
@@ -396,7 +450,7 @@ export class VoiceEngine {
         }
         if (!(e instanceof DOMException) || e.name !== "InvalidStateError") {
           this.stopListening();
-          throw new Error("Speech recognition could not start. Check the Windows speech service.");
+          throw new Error("Speech recognition could not start. Check the Whisper service.");
         }
       }
     }
@@ -424,6 +478,15 @@ export class VoiceEngine {
       this.microphoneStream.getTracks().forEach((track) => track.stop());
       this.microphoneStream = null;
     }
+    if (this.audioRecorder) {
+      try {
+        if (this.audioRecorder.state !== "inactive") this.audioRecorder.stop();
+      } catch {
+        // The recorder may already have stopped with the microphone track.
+      }
+      this.audioRecorder = null;
+    }
+    this.recordedAudioChunks = [];
     if (this.audioContext && this.audioContext.state !== "closed") {
       this.audioContext.close();
       this.audioContext = null;
@@ -440,27 +503,34 @@ export class VoiceEngine {
     try {
       this.nativeSpeechCleanup = window.magicVoice.onTranscript(({ text, confidence }) => {
         if (this.isSpeaking || !this.isListening) return;
-        this.processRecognizedText(text, true, confidence);
+        void this.requestCloudCorrection(text, confidence).then((corrected) => {
+          if (!corrected) this.processRecognizedText(text, true, confidence);
+          this.recordedAudioChunks = [];
+        });
       });
       const nativeErrorCleanup = window.magicVoice.onError((message) => {
         if (this.isListening) {
-          VoiceEngine.errorListeners.forEach((listener) => listener(`Windows speech service: ${message}`));
+          VoiceEngine.errorListeners.forEach((listener) => listener(`Whisper speech service: ${message}`));
         }
+      });
+      const nativeLevelCleanup = window.magicVoice.onLevel?.((level) => {
+        if (this.isListening) this.callbacks.onAudioLevel(Math.max(0, Math.min(1, level)));
       });
       const existingCleanup = this.nativeSpeechCleanup;
       this.nativeSpeechCleanup = () => {
         existingCleanup?.();
         nativeErrorCleanup();
+        nativeLevelCleanup?.();
       };
       const started = await window.magicVoice.start();
       if (started === false) {
-        throw new Error("The Windows speech process did not start.");
+        throw new Error("The Whisper speech process did not start.");
       }
       this.nativeSpeechActive = true;
     } catch (error) {
       this.stopNativeSpeechFallback();
       this.stopListening();
-      throw new Error(`Windows speech recognition could not start: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Whisper speech recognition could not start: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -477,13 +547,14 @@ export class VoiceEngine {
     const activeText = text.trim();
     if (!activeText) return;
 
-    const isPureWakeWord = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[!?.,]*\s*$/i.test(activeText);
+    const wakeWord = "(?:magic|nova)";
+    const isPureWakeWord = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${wakeWord}[!?.,]*\\s*$`, "i").test(activeText);
     if (isPureWakeWord) {
       this.callbacks.onWakeWordDetected(activeText);
       return;
     }
 
-    const wakeWordPrefixRegex = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[,:\s]+(.+)$/i;
+    const wakeWordPrefixRegex = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${wakeWord}[,:\\s]+(.+)$`, "i");
     const match = activeText.match(wakeWordPrefixRegex);
     if (match) {
       this.callbacks.onTranscript(match[2].trim(), isFinal, confidence);

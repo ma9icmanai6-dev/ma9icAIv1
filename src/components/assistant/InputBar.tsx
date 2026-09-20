@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Mic, MicOff, Send, Monitor, Camera, MousePointer, User, Radio, Loader2 } from "lucide-react";
+import { Mic, MicOff, Send, Monitor, Camera, MousePointer, Loader2 } from "lucide-react";
 import { AssistantState } from "../../types";
 
 interface InputBarProps {
@@ -9,8 +9,6 @@ interface InputBarProps {
   onCaptureScreen: () => void;
   onCaptureCamera: () => void;
   onTakeControl: () => void;
-  visualMode: "avatar" | "orb";
-  onVisualModeChange: (mode: "avatar" | "orb") => void;
   state: AssistantState;
   isAnalyzingVision?: boolean;
 }
@@ -22,8 +20,6 @@ export const InputBar: React.FC<InputBarProps> = ({
   onCaptureScreen,
   onCaptureCamera,
   onTakeControl,
-  visualMode,
-  onVisualModeChange,
   state,
   isAnalyzingVision = false,
 }) => {
@@ -45,12 +41,12 @@ export const InputBar: React.FC<InputBarProps> = ({
   };
 
   return (
-    <div className="p-4 bg-slate-950/80 border-t border-slate-800/80 backdrop-blur-xl">
+    <div className="p-3 bg-slate-950/80 border-t border-slate-800/80 backdrop-blur-xl">
       {/* Quick Suggestion Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none text-xs">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none text-[11px]">
         <button
           onClick={onCaptureCamera}
-          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-purple-300 transition-colors cursor-pointer"
+          className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-purple-300 transition-colors cursor-pointer"
         >
           <Camera className="w-3.5 h-3.5" />
           <span>Camera Vision</span>
@@ -59,7 +55,7 @@ export const InputBar: React.FC<InputBarProps> = ({
         <button
           onClick={onCaptureScreen}
           disabled={isAnalyzingVision}
-          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-cyan-300 transition-colors cursor-pointer disabled:opacity-50"
+          className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-cyan-300 transition-colors cursor-pointer disabled:opacity-50"
         >
           {isAnalyzingVision ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -72,42 +68,11 @@ export const InputBar: React.FC<InputBarProps> = ({
         {[
           "Take Control",
           "What can you do?",
-          "Plan a project workflow",
-          "Remember I prefer concise replies",
-        ].map((chip, idx) => chip === "Plan a project workflow" ? (
-          <div
-              key={idx}
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-800 text-xs"
-          >
-              <span className="text-slate-500">View:</span>
-              <span className="inline-flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onVisualModeChange("avatar")}
-                  className={visualMode === "avatar" ? "text-sky-300" : "text-slate-400"}
-                  title="Show the 3D head"
-                >
-                  <User className="inline h-3.5 w-3.5" /> Head
-                </button>
-                <span className="text-slate-600">/</span>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onVisualModeChange("orb");
-                  }}
-                  className={visualMode === "orb" ? "text-sky-300" : "text-slate-400"}
-                  title="Show the voice orb"
-                >
-                  <Radio className="inline h-3.5 w-3.5" /> Orb
-                </button>
-              </span>
-            </div>
-          ) : (
+        ].map((chip, idx) => (
             <button
               key={idx}
               onClick={() => chip === "Take Control" ? onTakeControl() : onSendMessage(chip)}
-              className="shrink-0 px-3 py-1.5 rounded-full bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
+              className="shrink-0 px-2.5 py-1.5 rounded-full bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
             >
               {chip === "Take Control" ? (
                 <span className="inline-flex items-center gap-1.5 text-amber-200">
@@ -120,7 +85,7 @@ export const InputBar: React.FC<InputBarProps> = ({
       </div>
 
       {/* Main Command Input Box */}
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-1">
+      <form onSubmit={handleSubmit} className="flex items-center gap-1.5 mt-1">
         <div className="relative flex-1 flex items-center bg-slate-900 border border-slate-800 focus-within:border-indigo-500 rounded-2xl transition-colors shadow-inner">
           <input
             ref={inputRef}
@@ -133,7 +98,7 @@ export const InputBar: React.FC<InputBarProps> = ({
                 ? "Listening to your voice... (or type here)"
                 : "Ask Magic anything, or click the mic to talk..."
             }
-            className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+            className="w-full bg-transparent px-3 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
           />
 
           {/* Inline Action Buttons inside input */}
@@ -154,7 +119,7 @@ export const InputBar: React.FC<InputBarProps> = ({
         <button
           type="button"
           onClick={onToggleListening}
-          className={`relative p-3.5 rounded-2xl transition-all flex items-center justify-center cursor-pointer shadow-lg ${
+          className={`relative p-3 rounded-2xl transition-all flex items-center justify-center cursor-pointer shadow-lg ${
             isListening
               ? "bg-cyan-500 text-slate-950 ring-4 ring-cyan-500/30 scale-105"
               : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
@@ -172,7 +137,7 @@ export const InputBar: React.FC<InputBarProps> = ({
         <button
           type="submit"
           disabled={!inputText.trim() || state === "processing"}
-          className="p-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white transition-all flex items-center justify-center cursor-pointer shadow-lg shadow-indigo-600/20"
+          className="p-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white transition-all flex items-center justify-center cursor-pointer shadow-lg shadow-indigo-600/20"
           title="Send message"
         >
           {state === "processing" ? (

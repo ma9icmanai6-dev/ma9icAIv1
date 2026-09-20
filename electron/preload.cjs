@@ -31,4 +31,9 @@ contextBridge.exposeInMainWorld("magicVoice", {
     ipcRenderer.on("magic-voice-error", listener);
     return () => ipcRenderer.removeListener("magic-voice-error", listener);
   },
+  onLevel: (callback) => {
+    const listener = (_event, level) => callback(level);
+    ipcRenderer.on("magic-voice-level", listener);
+    return () => ipcRenderer.removeListener("magic-voice-level", listener);
+  },
 });

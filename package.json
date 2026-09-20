@@ -14,6 +14,7 @@
     "desktop:dev": "npm run build && electron .",
     "desktop:package": "npm run build && npx @electron/packager . \"Magic-AI-Assistant\" --platform=win32 --arch=x64 --out=dist-app --overwrite",
     "desktop:build": "npm run desktop:package",
+    "release:quick": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\release-quick.ps1",
     "preview": "vite preview",
 
     "clean": "rm -rf dist server.js",
@@ -80,4 +81,3 @@
     }
   }
 }
-

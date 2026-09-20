@@ -29,6 +29,14 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
             <h3 className="font-semibold text-sm text-white">Super AI Control Permission</h3>
             <p className="text-[11px] text-amber-200/80">Automated Keyboard & Mouse Navigation Request</p>
           </div>
+          <button
+            type="button"
+            onClick={onDeny}
+            className="ml-auto rounded-lg p-1.5 text-amber-200/70 hover:bg-white/10 hover:text-white"
+            title="Close permission dialog"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Content */}

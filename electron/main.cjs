@@ -4,9 +4,6 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 
-app.commandLine.appendSwitch("enable-speech-input");
-app.commandLine.appendSwitch("enable-features", "WebSpeechAPI");
-
 const port = Number(process.env.MAGIC_PORT || 3210);
 const AI_SCREEN_WIDTH = 1280;
 const AI_SCREEN_HEIGHT = 800;
@@ -16,7 +13,7 @@ let speechProcess = null;
 let speechWindow = null;
 let speechStopRequested = false;
 
-function stopWindowsSpeech() {
+function stopWhisperSpeech() {
   speechStopRequested = true;
   if (speechProcess) {
     speechProcess.kill();
@@ -24,40 +21,16 @@ function stopWindowsSpeech() {
   }
 }
 
-function startWindowsSpeech(window) {
-  stopWindowsSpeech();
+function startWhisperSpeech(window) {
+  stopWhisperSpeech();
   speechStopRequested = false;
   speechWindow = window;
-
-  const script = `
-try {
-  Add-Type -AssemblyName System.Speech
-  $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine
-  $engine.SetInputToDefaultAudioDevice()
-  $engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
-  [Console]::WriteLine("READY")
-  [Console]::Out.Flush()
-  while ($true) {
-    $result = $engine.Recognize()
-    if ($null -ne $result -and $result.Text) {
-      [Console]::WriteLine(("TRANSCRIPT|" + $result.Text + "|" + $result.Confidence.ToString([Globalization.CultureInfo]::InvariantCulture)))
-      [Console]::Out.Flush()
-    }
-  }
-} catch {
-  [Console]::Error.WriteLine(("SPEECH_ERROR|" + $_.Exception.Message))
-  exit 1
-}
-`;
-
-  speechProcess = spawn("powershell.exe", [
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-Command",
-    script,
-  ], { windowsHide: true });
+  const workerPath = path.join(__dirname, "whisper_worker.py");
+  const pythonCommand = process.env.MAGIC_PYTHON || "python";
+  speechProcess = spawn(pythonCommand, [workerPath], {
+    windowsHide: true,
+    env: { ...process.env, PYTHONUNBUFFERED: "1" },
+  });
 
   let output = "";
   speechProcess.stdout.on("data", (chunk) => {
@@ -65,7 +38,7 @@ try {
     const lines = output.split(/\r?\n/);
     output = lines.pop() || "";
     for (const line of lines) {
-      if (line === "READY" && speechWindow && !speechWindow.isDestroyed()) {
+      if (line.startsWith("READY|") && speechWindow && !speechWindow.isDestroyed()) {
         speechWindow.webContents.send("magic-voice-ready");
         continue;
       }
@@ -75,6 +48,9 @@ try {
           text,
           confidence: Number(confidence) || 0.8,
         });
+      }
+      if (kind === "LEVEL" && speechWindow && !speechWindow.isDestroyed()) {
+        speechWindow.webContents.send("magic-voice-level", Number(text) || 0);
       }
     }
   });
@@ -95,7 +71,7 @@ try {
 
   speechProcess.once("exit", () => {
     if (!speechStopRequested && speechWindow && !speechWindow.isDestroyed() && !desktopKilled) {
-      speechWindow.webContents.send("magic-voice-error", "Windows speech recognition stopped.");
+      speechWindow.webContents.send("magic-voice-error", "Whisper speech recognition stopped.");
     }
     speechProcess = null;
   });
@@ -242,10 +218,10 @@ ipcMain.handle("desktop-capture-screen", async (event) => {
   }
 });
 ipcMain.handle("magic-voice-start", (event) => {
-  startWindowsSpeech(BrowserWindow.fromWebContents(event.sender));
+  startWhisperSpeech(BrowserWindow.fromWebContents(event.sender));
   return true;
 });
-ipcMain.on("magic-voice-stop", () => stopWindowsSpeech());
+ipcMain.on("magic-voice-stop", () => stopWhisperSpeech());
 ipcMain.on("desktop-control-kill", () => {
   desktopKilled = true;
   desktopPermission = "none";
@@ -271,12 +247,12 @@ ipcMain.on("magic-window-layout", (event, overlayMode) => {
       height,
     });
   } else {
-    window.setMinimumSize(960, 640);
+    window.setMinimumSize(544, 420);
     window.setBounds({
-      x: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.width - 1440) / 2)),
-      y: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.height - 900) / 2)),
-      width: 1440,
-      height: 900,
+      x: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.width - 544) / 2)),
+      y: Math.max(0, Math.round((screen.getPrimaryDisplay().workArea.height - 450) / 2)),
+      width: 544,
+      height: 450,
     });
   }
 });
@@ -332,10 +308,10 @@ async function createWindow() {
   });
 
   const window = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 960,
-    minHeight: 640,
+    width: 544,
+    height: 450,
+    minWidth: 544,
+    minHeight: 420,
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -358,7 +334,7 @@ app.whenReady().then(createWindow).catch((error) => {
 });
 
 app.on("window-all-closed", () => {
-  stopWindowsSpeech();
+  stopWhisperSpeech();
   globalShortcut.unregisterAll();
   if (process.platform !== "darwin") app.quit();
 });

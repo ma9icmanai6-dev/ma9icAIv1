@@ -51,6 +51,9 @@ function normalizeDesktopIntent(message: string, parsed: any, visionContext: any
   ];
   const requestedApp = appAliases.find(([pattern]) => pattern.test(request))?.[1];
   const asksToOpen = /\b(open|launch|start|load|run)\b/.test(request);
+  const browserUrlMatch = message.match(
+    /\b(?:open|go\s+to|navigate\s+to)\s+(?:https?:\/\/)?(www\.)?([a-z0-9.-]+\.[a-z]{2,})(?:\/[^\s]*)?\s+(?:in|using|with)\s+(edge|chrome|brave|firefox)\b/i
+  );
   const fileMatch = message.match(/\b(?:open|load)\s+(?:the\s+)?file\s+["']?(.+?)["']?\s*$/i);
   const browserSearchMatch = message.match(
     /\b(?:in|using|with)\s+(edge|chrome|brave|firefox)\b[\s\S]*?\b(?:search|look\s+up|find)\s+(?:for\s+)?["']?(.+?)["']?\s*$/i
@@ -74,6 +77,33 @@ function normalizeDesktopIntent(message: string, parsed: any, visionContext: any
       }
     : null);
   const visibleInputMatch = message.match(/\b(?:click|go to|focus|use)\s+(?:the\s+)?(?:search|address|query|text)\s+(?:box|bar|field)\b[\s\S]*?\b(?:type|enter|search)\s+(?:for\s+)?["']?(.+?)["']?(?:\s+(?:and\s+)?(?:press|hit)\s+enter)?\s*$/i);
+
+  if (browserUrlMatch) {
+    const host = `${browserUrlMatch[1] || ""}${browserUrlMatch[2]}`;
+    const url = `https://${host}`;
+    const browser = browserUrlMatch[3].toLowerCase();
+    return {
+      ...parsed,
+      action: {
+        type: "MULTI_STEP_PLAN",
+        description: `Open ${url} in ${browser}`,
+        multiStepPlan: {
+          planTitle: `Open ${host}`,
+          spokenIntro: `I will open ${browser} and navigate to ${host}.`,
+          steps: [
+            { stepNumber: 1, description: `Open ${browser}`, actionType: "LAUNCH_APP", params: { app: browser }, status: "pending", estimatedDurationMs: 1200 },
+            { stepNumber: 2, description: "Wait for the browser window", actionType: "WAIT", params: { ms: 1800 }, status: "pending", estimatedDurationMs: 1800 },
+            { stepNumber: 3, description: "Focus the browser address bar", actionType: "KEY_PRESS", params: { key: "^l" }, status: "pending", estimatedDurationMs: 200 },
+            { stepNumber: 4, description: `Enter ${url}`, actionType: "TYPE_INPUT", params: { text: url }, status: "pending", estimatedDurationMs: 500 },
+            { stepNumber: 5, description: "Open the website", actionType: "KEY_PRESS", params: { key: "~" }, status: "pending", estimatedDurationMs: 300 },
+          ],
+          spokenCompletion: `${host} is open in ${browser}.`,
+          currentStepIndex: 0,
+          status: "idle",
+        },
+      },
+    };
+  }
 
   if (visibleInputMatch && targetPoint) {
     const query = visibleInputMatch[1].replace(/\s+(?:and\s+)?(?:press|hit)\s+enter\s*$/i, "").trim();
@@ -363,6 +393,47 @@ async function generateContentWithFallback(ai: GoogleGenAI, baseConfig: any, tim
   throw lastErr;
 }
 
+// Low-confidence voice correction. The local Windows recognizer remains the
+// first pass; this endpoint is only used when the renderer asks for a retry.
+app.post("/api/transcribe", async (req, res) => {
+  try {
+    const { audioBase64, mimeType = "audio/webm" } = req.body || {};
+    if (!audioBase64 || typeof audioBase64 !== "string") {
+      return res.status(400).json({ error: "audioBase64 is required" });
+    }
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({ available: false, error: "Cloud transcription is not configured." });
+    }
+
+    const ai = getAI();
+    const response = await generateContentWithFallback(ai, {
+      contents: [{
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              data: audioBase64.replace(/^data:[^;]+;base64,/, ""),
+              mimeType,
+            },
+          },
+          {
+            text: "Transcribe the spoken English in this recording exactly. Return only the words spoken, with no explanation. If there is no clear speech, return an empty string.",
+          },
+        ],
+      }],
+    }, 15000);
+
+    const text = String(response.text || "")
+      .replace(/^```(?:text)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+    return res.json({ available: true, text, confidence: text ? 0.9 : 0 });
+  } catch (error: any) {
+    console.warn("[Voice] Cloud transcription failed:", error?.message || error);
+    return res.status(502).json({ available: false, error: "Cloud transcription failed." });
+  }
+});
+
 // GET AI Configuration & Status
 app.get("/api/ai/config", async (_req, res) => {
   const ollama = await getOllamaStatus();
@@ -438,9 +509,10 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const systemPrompt = `You are "Magic", a sophisticated, friendly, articulate, highly capable AI desktop assistant inside the Magic AI app.
+    const systemPrompt = `You are "Nova", a sophisticated, friendly, articulate, highly capable AI desktop assistant inside the ma9ic AI app.
 Persona: Composed, attentive, clear, proactive, and elegant.
 Voice response style: Concise, spoken-friendly, conversational, direct (under 40 words).
+Always refer to yourself as Nova. Never call yourself Magic.
 
 User Stored Memories: ${JSON.stringify(memories)}
 Latest Screen Analysis: ${JSON.stringify(visionContext)}

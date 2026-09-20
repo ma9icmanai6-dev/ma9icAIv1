@@ -30,6 +30,9 @@ import {
   Volume2,
   User,
   X,
+  Eye,
+  EyeOff,
+  Loader2,
 } from "lucide-react";
 
 function describeError(error: unknown, fallback: string): string {
@@ -46,6 +49,9 @@ export default function App() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [visualMode, setVisualMode] = useState<"avatar" | "orb">("avatar");
   const [experienceMode, setExperienceMode] = useState<"full" | "model">("full");
+  const [showVisualStage, setShowVisualStage] = useState(false);
+  const [showActivityPanel, setShowActivityPanel] = useState(true);
+  const [activityText, setActivityText] = useState("");
   const [guiBlurred, setGuiBlurred] = useState(true);
   const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>("none");
   const [pendingPlan, setPendingPlan] = useState<MultiStepPlan | null>(null);
@@ -156,8 +162,10 @@ export default function App() {
   const executePlanSequence = useCallback(
     async (plan: MultiStepPlan) => {
       setAssistantState("executing");
+      setShowActivityPanel(true);
 
       for (let i = 0; i < plan.steps.length; i++) {
+        setActivityText(plan.steps[i].description || `Running step ${i + 1}`);
         // Update plan progress
         setMessages((prev) =>
           prev.map((msg) => {
@@ -198,6 +206,7 @@ export default function App() {
             )
           );
           setAssistantState("error");
+          setShowActivityPanel(false);
           VoiceEngine.speak(`Desktop control stopped: ${reason}`, () => setAssistantState("idle"));
           return;
         }
@@ -228,6 +237,8 @@ export default function App() {
       const completionText = plan.spokenCompletion || "I have completed all steps in the plan.";
       VoiceEngine.speak(completionText, () => {
         setAssistantState("idle");
+        setActivityText("");
+        setShowActivityPanel(false);
       });
     },
     [executeDesktopAction]
@@ -693,6 +704,7 @@ export default function App() {
           connectionProgress={connectionProgress}
           onQuickAction={handleModelQuickAction}
           onToggleFullView={() => setExperienceMode("full")}
+          loadOnMount
           className="h-screen w-screen"
         />
       ) : (
@@ -704,7 +716,8 @@ export default function App() {
       </div>
 
       {/* Top Header Bar */}
-      <header className={`relative z-10 shrink-0 h-16 px-4 sm:px-6 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-between`}>
+      <header className={`relative z-10 shrink-0 h-16 px-3 sm:px-4 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-center`}>
+        <div className="w-full max-w-lg flex items-center justify-between">
         {/* Brand & Identity */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">
@@ -714,7 +727,7 @@ export default function App() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-white tracking-tight">Magic AI</h1>
+              <h1 className="text-base font-semibold text-white tracking-tight">ma9ic AI</h1>
               <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-medium text-indigo-300">
                 Assistant
               </span>
@@ -732,6 +745,14 @@ export default function App() {
             title="Show model only"
           >
             <User className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setShowVisualStage((visible) => !visible)}
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title={showVisualStage ? "Hide AI model" : "Show AI model"}
+          >
+            {showVisualStage ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
 
           {isDesktopShell && (
@@ -778,18 +799,22 @@ export default function App() {
             </button>
           )}
         </div>
+        </div>
       </header>
 
       {/* Main Assistant Body */}
-      <main className="relative z-10 flex-1 min-h-0 flex flex-col max-w-2xl w-full mx-auto overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col max-w-lg w-full mx-auto overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
         {/* Dynamic Visual Stage: 3D Rigged Head or Luminous Orb */}
-        <div className="shrink-0 border-b border-slate-800/40 bg-gradient-to-b from-slate-950/40 to-transparent">
+        {showVisualStage && <div className="shrink-0 border-b border-slate-800/40 bg-gradient-to-b from-slate-950/40 to-transparent">
           {visualMode === "avatar" ? (
             <AvatarCanvas
               isSpeaking={assistantState === "speaking"}
               audioLevel={audioLevel}
               onSpeakGreeting={triggerMagicGreeting}
-              className="h-56 sm:h-64 w-full"
+              visualMode={visualMode}
+              onVisualModeChange={setVisualMode}
+              loadOnMount
+              className="h-44 sm:h-52 w-full"
             />
           ) : (
             <VoiceOrb
@@ -801,7 +826,7 @@ export default function App() {
               onStopSpeaking={handleStopSpeaking}
             />
           )}
-        </div>
+        </div>}
 
         {/* Conversation Feed */}
         <ChatFeed
@@ -819,12 +844,34 @@ export default function App() {
           onCaptureScreen={handleCaptureScreen}
           onCaptureCamera={handleCaptureCamera}
           onTakeControl={() => setIsTakeControlOpen(true)}
-          visualMode={visualMode}
-          onVisualModeChange={setVisualMode}
           state={assistantState}
           isAnalyzingVision={isAnalyzingVision}
         />
       </main>
+
+      {assistantState === "executing" && showActivityPanel && (
+        <div className="desktop-modal-backdrop pointer-events-none fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="desktop-modal-panel pointer-events-auto w-full max-w-sm rounded-2xl border border-cyan-300/25 bg-slate-950/90 p-4 text-slate-100 shadow-2xl shadow-cyan-950/40 backdrop-blur-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
+                <div>
+                  <p className="text-sm font-semibold">Nova is working</p>
+                  <p className="mt-1 text-xs text-slate-400">{activityText || "Executing the requested desktop actions..."}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowActivityPanel(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
+                title="Hide activity panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Voice & Settings Modal */}
       <VoiceSettingsModal

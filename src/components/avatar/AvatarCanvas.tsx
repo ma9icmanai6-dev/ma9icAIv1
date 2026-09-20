@@ -22,6 +22,7 @@ import {
   Link,
   ChevronDown,
   User,
+  Radio,
   Layers,
   X,
   Search,
@@ -50,6 +51,9 @@ interface AvatarCanvasProps {
   voiceNotice?: string | null;
   connectionProgress?: number | null;
   onToggleFullView?: () => void;
+  visualMode?: "avatar" | "orb";
+  onVisualModeChange?: (mode: "avatar" | "orb") => void;
+  loadOnMount?: boolean;
   modelOnly?: boolean;
   className?: string;
 }
@@ -67,7 +71,10 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   voiceNotice = null,
   connectionProgress = null,
   onToggleFullView,
+  visualMode = "avatar",
+  onVisualModeChange,
   modelOnly = false,
+  loadOnMount = modelOnly,
   className = "",
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -351,7 +358,9 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     controlsRef.current = controls;
 
     // 6. Load the startup avatar with fallback to procedural head
-    loadModelFromPath(STARTUP_MODEL_URL, scene);
+    if (loadOnMount) {
+      loadModelFromPath(STARTUP_MODEL_URL, scene);
+    }
 
     // 7. Subscribe to LipSyncEngine
     const lipSync = LipSyncEngine.getInstance();
@@ -540,7 +549,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
         renderer.domElement.parentElement.removeChild(renderer.domElement);
       }
     };
-  }, [loadModelFromPath]);
+  }, [loadModelFromPath, loadOnMount]);
 
   /**
    * Handle Drag and Drop of 3D files (.glb, .gltf, .vrm, .obj)
@@ -777,9 +786,9 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       )}
 
       {/* Top Header Badge & Action Controls */}
-      <div className={`${modelOnly ? "hidden" : ""} absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-20`}>
+      <div className={`${modelOnly ? "hidden" : ""} absolute inset-0 pointer-events-none z-20`}>
         {/* Model Info with Selector Trigger */}
-        <div className="relative pointer-events-auto">
+        <div className="absolute top-4 left-4 relative pointer-events-auto">
           <button
             onClick={() => setShowModelMenu(!showModelMenu)}
             className="flex items-center gap-2.5 bg-slate-900/85 hover:bg-slate-900 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg text-left transition group"
@@ -887,7 +896,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="absolute top-[4.5rem] left-4 flex max-w-96 flex-col items-start gap-1.5 pointer-events-auto">
           <label
             title="Upload custom 3D model (.glb, .gltf, .vrm, .obj)"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-850/90 hover:bg-slate-750 text-sky-300 border border-sky-500/20 text-xs font-medium cursor-pointer shadow-lg transition"
@@ -901,6 +910,27 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
               className="hidden"
             />
           </label>
+
+          {onVisualModeChange && (
+            <div className="flex items-center gap-0.5 rounded-xl border border-white/10 bg-slate-900/80 p-0.5 shadow-lg">
+              <button
+                type="button"
+                onClick={() => onVisualModeChange("avatar")}
+                className={`rounded-lg p-1.5 transition ${visualMode === "avatar" ? "bg-sky-500 text-white" : "text-slate-400 hover:text-white"}`}
+                title="Show 3D head"
+              >
+                <User className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onVisualModeChange("orb")}
+                className={`rounded-lg p-1.5 transition ${visualMode === "orb" ? "bg-sky-500 text-white" : "text-slate-400 hover:text-white"}`}
+                title="Show voice orb"
+              >
+                <Radio className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           <button
             onClick={() => {
@@ -990,40 +1020,33 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
         </div>
       )}
 
-      {/* Bottom Floating Action Bar */}
-      <div className={`${modelOnly ? "hidden" : ""} absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none z-20`}>
-        {/* Interactive Speech & Viseme Trigger Buttons */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {onSpeakGreeting && (
-            <button
-              onClick={onSpeakGreeting}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-sky-500/25 transition active:scale-95"
-            >
-              <Volume2 className="w-3.5 h-3.5" />
-              <span>Say "Hi, how can I help you?"</span>
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Slide-out Morph Target Inspector Panel */}
       {showInspector && !modelOnly && (
-        <div className="absolute top-16 right-4 w-80 max-h-[75vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl p-4 text-slate-200 z-30 space-y-3 animate-in fade-in slide-in-from-right duration-200">
+        <div className="absolute top-16 right-4 w-80 max-w-[calc(100%-2rem)] max-h-[75vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl p-4 text-slate-200 z-30 space-y-3 animate-in fade-in slide-in-from-right duration-200">
           <div className="flex items-center justify-between border-b border-white/10 pb-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-white">
               <Sliders className="w-4 h-4 text-sky-400" />
               <span>Morph Target Debugger</span>
             </div>
-            <button
-              onClick={() => {
-                setManualWeights({});
-                LipSyncEngine.getInstance().resetWeights();
-              }}
-              className="flex items-center gap-1 text-[10px] text-sky-400 hover:underline"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setManualWeights({});
+                  LipSyncEngine.getInstance().resetWeights();
+                }}
+                className="flex items-center gap-1 text-[10px] text-sky-400 hover:underline"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+              <button
+                onClick={() => setShowInspector(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+                title="Close morph target inspector"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
           <p className="text-[10px] text-slate-400">

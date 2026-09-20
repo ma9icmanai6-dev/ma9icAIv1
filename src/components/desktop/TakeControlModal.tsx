@@ -57,6 +57,15 @@ export const TakeControlModal: React.FC<TakeControlModalProps> = ({
             ref={inputRef}
             value={task}
             onChange={(event) => setTask(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (task.trim()) {
+                  onSubmit(task.trim());
+                  setTask("");
+                }
+              }
+            }}
             rows={4}
             placeholder="Example: Open Edge, click the search box, search for Nintendo games, and press Enter."
             className="w-full resize-none rounded-2xl border border-white/15 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/60"
@@ -75,16 +84,19 @@ export const TakeControlModal: React.FC<TakeControlModalProps> = ({
 
           <div className="flex items-center gap-2 rounded-xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-100">
             <Zap className="h-4 w-4 shrink-0 text-amber-300" />
-            <span>Magic will ask for permission before controlling the desktop.</span>
+            <span>Nova will ask for permission before controlling the desktop.</span>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+            <span className="text-[11px] text-slate-500">Press Enter to send, or Shift+Enter for a new line.</span>
+            <div className="flex shrink-0 gap-2">
             <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-xs text-slate-400 hover:bg-white/10 hover:text-white">
               Cancel
             </button>
-            <button type="submit" disabled={!task.trim()} className="rounded-xl bg-cyan-400 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
-              Accept task and request control
+            <button type="submit" disabled={!task.trim()} className="rounded-xl bg-cyan-400 px-4 py-2.5 text-xs font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
+              Send and request control
             </button>
+            </div>
           </div>
         </div>
       </form>

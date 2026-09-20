@@ -45,7 +45,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
-        <div className="max-w-md w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
+        <div className="max-w-xl w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm shadow-xl">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
             <Sparkles className="w-6 h-6" />
           </div>
@@ -99,7 +99,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
       <AnimatePresence initial={false}>
         {messages.map((msg, idx) => (
           <motion.div
@@ -116,10 +116,10 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({
             )}
 
             <div
-              className={`max-w-[82%] sm:max-w-[75%] rounded-2xl p-4 text-sm leading-relaxed shadow-lg ${
+              className={`min-w-0 rounded-2xl p-3 text-xs leading-relaxed shadow-lg ${
                 msg.role === "user"
-                  ? "bg-indigo-600 text-white rounded-tr-sm"
-                  : "bg-slate-900/90 text-slate-100 border border-slate-800/90 rounded-tl-sm backdrop-blur-md"
+                  ? "max-w-[92%] bg-indigo-600 text-white rounded-tr-sm"
+                  : "flex-1 bg-slate-900/90 text-slate-100 border border-slate-800/90 rounded-tl-sm backdrop-blur-md"
               }`}
             >
               {/* Message Header / Timestamp */}
