@@ -7,6 +7,7 @@ interface SuperAIPermissionDialogProps {
   requestedActionDescription?: string;
   onGrant: (level: PermissionLevel) => void;
   onDeny: () => void;
+  assistantName?: string;
 }
 
 export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = ({
@@ -14,6 +15,7 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
   requestedActionDescription,
   onGrant,
   onDeny,
+  assistantName = "Nova",
 }) => {
   if (!isOpen) return null;
 
@@ -42,7 +44,7 @@ export const SuperAIPermissionDialog: React.FC<SuperAIPermissionDialogProps> = (
         {/* Content */}
         <div className="p-5 space-y-4 text-xs">
           <p className="text-slate-300 leading-relaxed">
-            Super AI Control allows Magic to move the mouse cursor, click interface elements, input text, and orchestrate multi-step computer tasks on your behalf.
+            Super AI Control allows {assistantName} to move the mouse cursor, click interface elements, input text, and orchestrate multi-step computer tasks on your behalf.
           </p>
 
           {requestedActionDescription && (

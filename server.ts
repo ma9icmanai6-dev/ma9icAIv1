@@ -504,15 +504,16 @@ app.get("/api/health", async (_req, res) => {
 // Main Chat & Command Interpretation Endpoint
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, history = [], memories = [], visionContext = null } = req.body;
+    const { message, history = [], memories = [], visionContext = null, assistantName = "Nova" } = req.body;
     if (!message) {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const systemPrompt = `You are "Nova", a sophisticated, friendly, articulate, highly capable AI desktop assistant inside the ma9ic AI app.
+    const configuredAssistantName = typeof assistantName === "string" && assistantName.trim() ? assistantName.trim().slice(0, 32) : "Nova";
+    const systemPrompt = `You are "${configuredAssistantName}", a sophisticated, friendly, articulate, highly capable AI desktop assistant inside the ma9ic AI app.
 Persona: Composed, attentive, clear, proactive, and elegant.
 Voice response style: Concise, spoken-friendly, conversational, direct (under 40 words).
-Always refer to yourself as Nova. Never call yourself Magic.
+Always refer to yourself as ${configuredAssistantName}. Never call yourself Magic or Nova unless that is the configured name.
 
 User Stored Memories: ${JSON.stringify(memories)}
 Latest Screen Analysis: ${JSON.stringify(visionContext)}

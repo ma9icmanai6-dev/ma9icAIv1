@@ -137,6 +137,7 @@ export class VoiceEngine {
   private callbacks: VoiceEngineCallbacks;
   private availableVoices: SpeechSynthesisVoice[] = [];
   private selectedVoice: SpeechSynthesisVoice | null = null;
+  private assistantName = "Nova";
 
   constructor(settings: VoiceSettings, callbacks: VoiceEngineCallbacks) {
     this.settings = settings;
@@ -204,6 +205,14 @@ export class VoiceEngine {
     }
   }
 
+  public setAssistantName(name: string) {
+    this.assistantName = name.trim() || "Nova";
+  }
+
+  public static setAssistantName(name: string): void {
+    this.getInstance().setAssistantName(name);
+  }
+
   public getSettings(): VoiceSettings {
     return { ...this.settings };
   }
@@ -250,7 +259,8 @@ export class VoiceEngine {
         if (!activeText) return;
 
         // Check if phrase is solely the wake word (e.g. "Magic", "Hey Magic", "Magic!")
-        const isPureWakeWord = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[!?.,]*\s*$/i.test(activeText);
+        const escapedName = this.assistantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const isPureWakeWord = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${escapedName}[!?.,]*\\s*$`, "i").test(activeText);
         if (isPureWakeWord) {
           if (finalTranscript || activeText.length >= 5) {
             this.callbacks.onWakeWordDetected(activeText);
@@ -259,7 +269,7 @@ export class VoiceEngine {
         }
 
         // If phrase starts with wake word followed by a command: "Magic what is on my screen"
-        const wakeWordPrefixRegex = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[,:\s]+(.+)$/i;
+        const wakeWordPrefixRegex = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${escapedName}[,:\\s]+(.+)$`, "i");
         const match = activeText.match(wakeWordPrefixRegex);
         if (match) {
           const commandText = match[2].trim();
@@ -547,14 +557,14 @@ export class VoiceEngine {
     const activeText = text.trim();
     if (!activeText) return;
 
-    const wakeWord = "(?:magic|nova)";
-    const isPureWakeWord = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${wakeWord}[!?.,]*\\s*$`, "i").test(activeText);
+    const escapedName = this.assistantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const isPureWakeWord = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${escapedName}[!?.,]*\\s*$`, "i").test(activeText);
     if (isPureWakeWord) {
       this.callbacks.onWakeWordDetected(activeText);
       return;
     }
 
-    const wakeWordPrefixRegex = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${wakeWord}[,:\\s]+(.+)$`, "i");
+    const wakeWordPrefixRegex = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${escapedName}[,:\\s]+(.+)$`, "i");
     const match = activeText.match(wakeWordPrefixRegex);
     if (match) {
       this.callbacks.onTranscript(match[2].trim(), isFinal, confidence);

@@ -24,7 +24,6 @@ import { TakeControlModal } from "./components/desktop/TakeControlModal";
 
 import {
   Sparkles,
-  Settings2,
   Trash2,
   Mic,
   Volume2,
@@ -101,6 +100,18 @@ export default function App() {
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(VoiceEngine.getSettings());
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [assistantName, setAssistantName] = useState(() => localStorage.getItem("assistant_name") || "Nova");
+
+  const handleAssistantNameChange = useCallback((value: string) => {
+    const nextName = value.replace(/\s+/g, " ").trimStart().slice(0, 32);
+    setAssistantName(nextName);
+    localStorage.setItem("assistant_name", nextName);
+    VoiceEngine.setAssistantName(nextName);
+  }, []);
+
+  useEffect(() => {
+    VoiceEngine.setAssistantName(assistantName);
+  }, [assistantName]);
 
   const setDesktopPermission = useCallback((level: PermissionLevel) => {
     setPermissionLevel(level);
@@ -131,7 +142,7 @@ export default function App() {
       const x = mapped.params.x;
       const y = mapped.params.y;
       if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) {
-        throw new Error("This action needs screen coordinates. Ask Magic to inspect the screen first, then try again.");
+        throw new Error(`This action needs screen coordinates. Ask ${assistantName} to inspect the screen first, then try again.`);
       }
       if (normalizedType === "DRAG" && (!Number.isFinite(Number(mapped.params.endX)) || !Number.isFinite(Number(mapped.params.endY)))) {
         throw new Error("Drag actions need a destination point.");
@@ -421,8 +432,8 @@ export default function App() {
     async (text: string, visionOverride?: VisionDetection | null) => {
       if (!text.trim()) return;
 
-      // If user says/types purely "Magic" or "Hey Magic", trigger greeting
-      const isPureWakeWord = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[!?.,]*\s*$/i.test(text.trim());
+      const escapedAssistantName = assistantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const isPureWakeWord = new RegExp(`^\\s*(hey\\s+|hi\\s+|ok\\s+|okay\\s+)?${escapedAssistantName}[!?.,]*\\s*$`, "i").test(text.trim());
       if (isPureWakeWord) {
         triggerMagicGreeting();
         return;
@@ -450,6 +461,7 @@ export default function App() {
             })),
             memories: MemoryService.getMemories(),
             visionContext: visionOverride ?? activeVision,
+            assistantName,
           }),
         });
 
@@ -531,7 +543,7 @@ export default function App() {
         setTimeout(() => setAssistantState("idle"), 3000);
       }
     },
-    [messages, activeVision, executePlanSequence, handleCaptureScreen, permissionLevel, triggerMagicGreeting]
+    [messages, activeVision, assistantName, executePlanSequence, handleCaptureScreen, permissionLevel, triggerMagicGreeting]
   );
 
   const handlePermissionGrant = useCallback((level: PermissionLevel) => {
@@ -721,7 +733,12 @@ export default function App() {
       <header className={`relative z-10 shrink-0 h-16 px-3 sm:px-4 ${isDesktopShell ? "border-transparent bg-transparent" : "border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl"} flex items-center justify-center`}>
         <div className="w-full max-w-lg flex items-center justify-between">
         {/* Brand & Identity */}
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setIsSettingsOpen(true)}
+          className="flex items-center gap-3 rounded-2xl p-1.5 text-left transition hover:bg-white/5"
+          title="Open assistant settings"
+        >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">
             <div className="w-full h-full rounded-[11px] bg-slate-950 flex items-center justify-center text-cyan-400">
               <Sparkles className="w-5 h-5" />
@@ -729,14 +746,14 @@ export default function App() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-white tracking-tight">ma9ic AI</h1>
+              <h1 className="text-base font-semibold text-white tracking-tight">{assistantName || "Assistant"}</h1>
               <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-medium text-indigo-300">
                 Assistant
               </span>
             </div>
             <p className="text-[11px] text-slate-400">Voice & Multimodal Intelligence</p>
           </div>
-        </div>
+        </button>
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 pr-12 sm:gap-2">
@@ -773,7 +790,7 @@ export default function App() {
             <button
               onClick={() => (window as any).magicWindow?.close()}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
-              title="Close Magic AI"
+              title={`Close ${assistantName}`}
             >
               <X className="w-4 h-4" />
             </button>
@@ -792,15 +809,6 @@ export default function App() {
               <Sparkles className="w-4 h-4" />
             </button>
           )}
-
-          {/* Settings Button */}
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Voice & Personality Settings"
-          >
-            <Settings2 className="w-4 h-4" />
-          </button>
 
           {/* Clear Chat Button */}
           {messages.length > 0 && (
@@ -839,6 +847,7 @@ export default function App() {
               onToggleListening={handleToggleListening}
               onClickOrb={handleOrbClick}
               onStopSpeaking={handleStopSpeaking}
+              assistantName={assistantName}
             />
           )}
         </div>}
@@ -846,6 +855,7 @@ export default function App() {
         {/* Conversation Feed */}
         <ChatFeed
           messages={messages}
+          assistantName={assistantName}
           onSpeak={handleSpeakText}
           onQuickPrompt={handleSendMessage}
           onOpenVisionDetail={() => setIsVisionModalOpen(true)}
@@ -861,6 +871,7 @@ export default function App() {
           onTakeControl={() => setIsTakeControlOpen(true)}
           state={assistantState}
           isAnalyzingVision={isAnalyzingVision}
+          assistantName={assistantName}
         />
       </main>
 
@@ -871,7 +882,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
                 <div>
-                  <p className="text-sm font-semibold">Nova is working</p>
+                  <p className="text-sm font-semibold">{assistantName} is working</p>
                   <p className="mt-1 text-xs text-slate-400">{activityText || "Executing the requested desktop actions..."}</p>
                 </div>
               </div>
@@ -898,6 +909,8 @@ export default function App() {
           setVoiceSettings(VoiceEngine.getSettings());
         }}
         availableVoices={availableVoices}
+        assistantName={assistantName}
+        onAssistantNameChange={handleAssistantNameChange}
       />
 
       {/* Memory Manager Modal */}
@@ -925,11 +938,13 @@ export default function App() {
         requestedActionDescription={pendingPlan?.planTitle || "A multi-step desktop control task"}
         onGrant={handlePermissionGrant}
         onDeny={handlePermissionDeny}
+        assistantName={assistantName}
       />
       <TakeControlModal
         isOpen={isTakeControlOpen}
         onClose={() => setIsTakeControlOpen(false)}
         onSubmit={handleTakeControl}
+        assistantName={assistantName}
       />
     </div>
   );

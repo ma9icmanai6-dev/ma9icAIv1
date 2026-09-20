@@ -9,6 +9,7 @@ interface VoiceOrbProps {
   isListening: boolean;
   onToggleListening: () => void;
   onStopSpeaking?: () => void;
+  assistantName?: string;
   onClickOrb?: () => void;
 }
 
@@ -18,6 +19,7 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   isListening,
   onToggleListening,
   onStopSpeaking,
+  assistantName = "Nova",
   onClickOrb,
 }) => {
   // Audio reactivity factor
@@ -41,7 +43,7 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
       case "processing":
         return "Thinking & synthesizing response...";
       case "speaking":
-        return "Magic is speaking (Click to stop)";
+        return `${assistantName} is speaking (Click to stop)`;
       case "executing":
         return "Executing plan actions...";
       case "error":
@@ -49,8 +51,8 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
       case "idle":
       default:
         return isListening
-          ? "Listening... Say 'Magic' or click orb"
-          : "Click orb or say 'Magic' to wake";
+          ? `Listening... Say '${assistantName}' or click orb`
+          : `Click orb or say '${assistantName}' to wake`;
     }
   };
 

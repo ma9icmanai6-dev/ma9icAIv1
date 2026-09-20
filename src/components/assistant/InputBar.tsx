@@ -11,6 +11,7 @@ interface InputBarProps {
   onTakeControl: () => void;
   state: AssistantState;
   isAnalyzingVision?: boolean;
+  assistantName?: string;
 }
 
 export const InputBar: React.FC<InputBarProps> = ({
@@ -22,6 +23,7 @@ export const InputBar: React.FC<InputBarProps> = ({
   onTakeControl,
   state,
   isAnalyzingVision = false,
+  assistantName = "Nova",
 }) => {
   const [inputText, setInputText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +98,7 @@ export const InputBar: React.FC<InputBarProps> = ({
             placeholder={
               isListening
                 ? "Listening to your voice... (or type here)"
-                : "Ask Magic anything, or click the mic to talk..."
+                : `Ask ${assistantName} anything, or click the mic to talk...`
             }
             className="w-full bg-transparent px-3 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
           />
@@ -124,7 +126,7 @@ export const InputBar: React.FC<InputBarProps> = ({
               ? "bg-cyan-500 text-slate-950 ring-4 ring-cyan-500/30 scale-105"
               : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
           }`}
-          title={isListening ? "Stop listening" : "Start voice listening (or say 'Hey Magic')"}
+          title={isListening ? "Stop listening" : `Start voice listening (or say 'Hey ${assistantName}')`}
         >
           {isListening ? (
             <Mic className="w-5 h-5 animate-pulse" />

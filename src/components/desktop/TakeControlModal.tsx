@@ -5,12 +5,14 @@ interface TakeControlModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (task: string) => void;
+  assistantName?: string;
 }
 
 export const TakeControlModal: React.FC<TakeControlModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  assistantName = "Nova",
 }) => {
   const [task, setTask] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -44,7 +46,7 @@ export const TakeControlModal: React.FC<TakeControlModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-semibold">Take Control</h2>
-              <p className="mt-1 text-xs text-slate-400">Tell Magic exactly what to do on your desktop.</p>
+              <p className="mt-1 text-xs text-slate-400">Tell {assistantName} exactly what to do on your desktop.</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white" title="Close">
@@ -84,7 +86,7 @@ export const TakeControlModal: React.FC<TakeControlModalProps> = ({
 
           <div className="flex items-center gap-2 rounded-xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-100">
             <Zap className="h-4 w-4 shrink-0 text-amber-300" />
-            <span>Nova will ask for permission before controlling the desktop.</span>
+            <span>{assistantName} will ask for permission before controlling the desktop.</span>
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-3">

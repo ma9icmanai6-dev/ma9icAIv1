@@ -9,6 +9,8 @@ interface VoiceSettingsModalProps {
   settings: VoiceSettings;
   onSettingsChange: (newSettings: Partial<VoiceSettings>) => void;
   availableVoices: SpeechSynthesisVoice[];
+  assistantName: string;
+  onAssistantNameChange: (name: string) => void;
 }
 
 export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
@@ -17,11 +19,13 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
   settings,
   onSettingsChange,
   availableVoices,
+  assistantName,
+  onAssistantNameChange,
 }) => {
   if (!isOpen) return null;
 
   const handleTestVoice = () => {
-    VoiceEngine.speak("Hello! I am Magic, your personal AI voice companion.");
+    VoiceEngine.speak(`Hello! I am ${assistantName}, your personal AI voice companion.`);
   };
 
   return (
@@ -48,6 +52,20 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
 
         {/* Controls Body */}
         <div className="mt-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              Assistant name
+            </label>
+            <input
+              value={assistantName}
+              onChange={(event) => onAssistantNameChange(event.target.value)}
+              placeholder="Nova"
+              maxLength={32}
+              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500"
+            />
+            <p className="mt-1 text-[11px] text-slate-500">This name is used throughout the assistant interface and voice prompts.</p>
+          </div>
+
           {/* Voice Selector */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">
@@ -125,7 +143,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
           <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
             <div>
               <span className="block text-xs font-medium text-slate-200">Local Wake-Word</span>
-              <span className="block text-[11px] text-slate-400">Triggers on "Magic" or "Hey Magic"</span>
+              <span className="block text-[11px] text-slate-400">Triggers on "{assistantName}" or "Hey {assistantName}"</span>
             </div>
             <input
               type="checkbox"
