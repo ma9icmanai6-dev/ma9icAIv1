@@ -35,7 +35,7 @@ function describeOllamaError(error: any): string {
   return `Ollama failed with ${activeOllamaModel}: ${message}`;
 }
 
-function normalizeDesktopIntent(message: string, parsed: any) {
+function normalizeDesktopIntent(message: string, parsed: any, visionContext: any = null) {
   const request = message.toLowerCase();
   const appAliases: Array<[RegExp, string]> = [
     [/\b(brave|brave browser)\b/, "brave"],
@@ -59,6 +59,66 @@ function normalizeDesktopIntent(message: string, parsed: any) {
     /\b(?:in|using|with)\s+(edge|chrome|brave|firefox)\b[\s\S]*?\b(?:type|enter|search)\s+(?:for\s+)?["']?(.+?)["']?(?:\s+and\s+(?:press|hit)\s+enter)?\s*$/i
   );
   const coordinateClickMatch = message.match(/\bclick\s+(?:at\s+)?(?:x\s*)?(\d{2,5})\s*(?:,|and)\s*(?:y\s*)?(\d{2,5})\b/i);
+  const visibleElements = Array.isArray(visionContext?.detectedElements) ? visionContext.detectedElements : [];
+  const targetElement = visibleElements.find((element: any) => {
+    const label = String(element.label || "").toLowerCase();
+    return element.center || element.boundingBox && (
+      /\b(search|address|query|input|text field|find)\b/.test(request) && /\b(search|address|query|input|text field|find)\b/.test(label)
+      || /\b(button|link|tab|menu)\b/.test(request) && label.includes(request.match(/\b(?:button|link|tab|menu)\s+["']?([^"']+)["']?/i)?.[1]?.toLowerCase() || "")
+    );
+  });
+  const targetPoint = targetElement?.center || (targetElement?.boundingBox
+    ? {
+        x: targetElement.boundingBox.x + targetElement.boundingBox.width / 2,
+        y: targetElement.boundingBox.y + targetElement.boundingBox.height / 2,
+      }
+    : null);
+  const visibleInputMatch = message.match(/\b(?:click|go to|focus|use)\s+(?:the\s+)?(?:search|address|query|text)\s+(?:box|bar|field)\b[\s\S]*?\b(?:type|enter|search)\s+(?:for\s+)?["']?(.+?)["']?(?:\s+(?:and\s+)?(?:press|hit)\s+enter)?\s*$/i);
+
+  if (visibleInputMatch && targetPoint) {
+    const query = visibleInputMatch[1].replace(/\s+(?:and\s+)?(?:press|hit)\s+enter\s*$/i, "").trim();
+    return {
+      ...parsed,
+      action: {
+        type: "MULTI_STEP_PLAN",
+        description: `Use the visible search field to enter ${query}`,
+        multiStepPlan: {
+          planTitle: "Use visible search field",
+          spokenIntro: `I found the visible search field. I will click it, enter ${query}, and submit it.`,
+          steps: [
+            { stepNumber: 1, description: `Move to ${targetElement.label || "search field"}`, actionType: "MOVE_MOUSE", params: targetPoint, status: "pending", estimatedDurationMs: 600 },
+            { stepNumber: 2, description: "Click the visible search field", actionType: "CLICK_BUTTON", params: targetPoint, status: "pending", estimatedDurationMs: 200 },
+            { stepNumber: 3, description: `Type ${query}`, actionType: "TYPE_INPUT", params: { text: query }, status: "pending", estimatedDurationMs: 500 },
+            { stepNumber: 4, description: "Submit the search", actionType: "KEY_PRESS", params: { key: "~" }, status: "pending", estimatedDurationMs: 300 },
+          ],
+          spokenCompletion: "The search was submitted.",
+          currentStepIndex: 0,
+          status: "idle",
+        },
+      },
+    };
+  }
+
+  if (targetPoint && /\b(click|press|select|open)\b/.test(request)) {
+    return {
+      ...parsed,
+      action: {
+        type: "MULTI_STEP_PLAN",
+        description: `Click ${targetElement.label || "the selected screen control"}`,
+        multiStepPlan: {
+          planTitle: `Click ${targetElement.label || "screen control"}`,
+          spokenIntro: `I found ${targetElement.label || "the requested control"} on the screen. I will move there and click it.`,
+          steps: [
+            { stepNumber: 1, description: `Move to ${targetElement.label || "target"}`, actionType: "MOVE_MOUSE", params: targetPoint, status: "pending", estimatedDurationMs: 600 },
+            { stepNumber: 2, description: `Click ${targetElement.label || "target"}`, actionType: "CLICK_BUTTON", params: targetPoint, status: "pending", estimatedDurationMs: 200 },
+          ],
+          spokenCompletion: `${targetElement.label || "The selected control"} was clicked.`,
+          currentStepIndex: 0,
+          status: "idle",
+        },
+      },
+    };
+  }
 
   if (browserTypeMatch) {
     const browser = browserTypeMatch[1].toLowerCase();
@@ -459,10 +519,8 @@ Return ONLY valid JSON matching this structure:
           };
         }
 
-        parsed = normalizeDesktopIntent(message, parsed);
-
-        parsed = normalizeDesktopIntent(message, parsed);
-        parsed = normalizeDesktopIntent(message, parsed);
+        parsed = normalizeDesktopIntent(message, parsed, visionContext);
+        parsed = normalizeDesktopIntent(message, parsed, visionContext);
         const spoken = parsed.spokenResponse || parsed.spokenReply || "How can I assist you?";
         return res.json({
           ...parsed,

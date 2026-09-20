@@ -86,6 +86,7 @@ export interface VisionDetection {
     label: string;
     location: string;
     boundingBox?: { x: number; y: number; width: number; height: number };
+    center?: { x: number; y: number };
   }>;
   extractedText: string;
   suggestedActions: string[];

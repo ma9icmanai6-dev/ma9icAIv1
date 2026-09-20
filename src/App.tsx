@@ -243,7 +243,7 @@ export default function App() {
         body: JSON.stringify({
           imageData: base64Image,
           instruction:
-            "Analyze what is currently visible on the screen. Identify active applications, visible elements, text, and suggest next actions.",
+            "Analyze the screen in detail for future mouse and keyboard control. Identify the active application and every visible search box, address bar, input, button, link, tab, menu, dialog, and important text. For each actionable element, return its exact screenshot-pixel boundingBox and center coordinates. Explain the page layout, focused control, readable labels, and what action each control would perform.",
         }),
       });
 
