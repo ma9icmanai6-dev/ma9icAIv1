@@ -6,6 +6,7 @@ declare global {
     magicVoice?: {
       start: () => Promise<boolean>;
       stop: () => void;
+      onReady?: (callback: () => void) => () => void;
       onTranscript: (callback: (payload: { text: string; confidence: number }) => void) => () => void;
       onError: (callback: (message: string) => void) => () => void;
     };
@@ -367,6 +368,20 @@ export class VoiceEngine {
     if (this.isListening) return;
     this.isListening = true;
     this.nativeFallbackAttempted = false;
+
+    // Electron's Chromium speech service is often unavailable in packaged
+    // builds. Prefer the native Windows recognizer when the IPC bridge exists.
+    if (window.magicVoice) {
+      await this.startNativeSpeechFallback();
+      try {
+        await this.startMicrophoneCapture();
+      } catch (error) {
+        // Native recognition owns the microphone; the analyser is only for UI.
+        console.warn("Audio level meter unavailable:", error);
+      }
+      return;
+    }
+
     await this.startMicrophoneCapture();
     if (!this.recognition) {
       await this.startNativeSpeechFallback();
@@ -437,7 +452,10 @@ export class VoiceEngine {
         existingCleanup?.();
         nativeErrorCleanup();
       };
-      await window.magicVoice.start();
+      const started = await window.magicVoice.start();
+      if (started === false) {
+        throw new Error("The Windows speech process did not start.");
+      }
       this.nativeSpeechActive = true;
     } catch (error) {
       this.stopNativeSpeechFallback();

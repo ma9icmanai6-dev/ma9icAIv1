@@ -645,7 +645,7 @@ export default function App() {
     const unsubVoiceError = VoiceEngine.onError((message: string) => {
       console.warn("Voice recognition stopped:", message);
       setVoiceNotice(message);
-      const isPermanentVoiceError = /permission was denied|unavailable|audio-capture|could not be initialized/i.test(message);
+      const isPermanentVoiceError = /permission was denied|unavailable|audio-capture|could not be initialized|speech recognition stopped|speech process did not start/i.test(message);
       if (isPermanentVoiceError) {
         setIsListening(false);
         setAssistantState("error");

@@ -14,8 +14,10 @@ let desktopPermission = "none";
 let desktopKilled = false;
 let speechProcess = null;
 let speechWindow = null;
+let speechStopRequested = false;
 
 function stopWindowsSpeech() {
+  speechStopRequested = true;
   if (speechProcess) {
     speechProcess.kill();
     speechProcess = null;
@@ -24,20 +26,28 @@ function stopWindowsSpeech() {
 
 function startWindowsSpeech(window) {
   stopWindowsSpeech();
+  speechStopRequested = false;
   speechWindow = window;
 
   const script = `
-Add-Type -AssemblyName System.Speech
-$engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine
-$engine.SetInputToDefaultAudioDevice()
-$engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
-Register-ObjectEvent -InputObject $engine -EventName SpeechRecognized -Action {
-  $result = $EventArgs.Result
-  [Console]::WriteLine(("TRANSCRIPT|" + $result.Text + "|" + $result.Confidence.ToString([Globalization.CultureInfo]::InvariantCulture)))
+try {
+  Add-Type -AssemblyName System.Speech
+  $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine
+  $engine.SetInputToDefaultAudioDevice()
+  $engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
+  [Console]::WriteLine("READY")
   [Console]::Out.Flush()
-} | Out-Null
-$engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
-while ($true) { Start-Sleep -Milliseconds 500 }
+  while ($true) {
+    $result = $engine.Recognize()
+    if ($null -ne $result -and $result.Text) {
+      [Console]::WriteLine(("TRANSCRIPT|" + $result.Text + "|" + $result.Confidence.ToString([Globalization.CultureInfo]::InvariantCulture)))
+      [Console]::Out.Flush()
+    }
+  }
+} catch {
+  [Console]::Error.WriteLine(("SPEECH_ERROR|" + $_.Exception.Message))
+  exit 1
+}
 `;
 
   speechProcess = spawn("powershell.exe", [
@@ -55,6 +65,10 @@ while ($true) { Start-Sleep -Milliseconds 500 }
     const lines = output.split(/\r?\n/);
     output = lines.pop() || "";
     for (const line of lines) {
+      if (line === "READY" && speechWindow && !speechWindow.isDestroyed()) {
+        speechWindow.webContents.send("magic-voice-ready");
+        continue;
+      }
       const [kind, text, confidence] = line.split("|");
       if (kind === "TRANSCRIPT" && text && speechWindow && !speechWindow.isDestroyed()) {
         speechWindow.webContents.send("magic-voice-transcript", {
@@ -68,7 +82,7 @@ while ($true) { Start-Sleep -Milliseconds 500 }
   speechProcess.stderr.on("data", (chunk) => {
     const message = chunk.toString().trim();
     if (message && speechWindow && !speechWindow.isDestroyed()) {
-      speechWindow.webContents.send("magic-voice-error", message);
+      speechWindow.webContents.send("magic-voice-error", message.replace(/^SPEECH_ERROR\|/, ""));
     }
   });
 
@@ -80,6 +94,9 @@ while ($true) { Start-Sleep -Milliseconds 500 }
   });
 
   speechProcess.once("exit", () => {
+    if (!speechStopRequested && speechWindow && !speechWindow.isDestroyed() && !desktopKilled) {
+      speechWindow.webContents.send("magic-voice-error", "Windows speech recognition stopped.");
+    }
     speechProcess = null;
   });
 }
