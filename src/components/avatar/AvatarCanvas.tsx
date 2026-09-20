@@ -32,18 +32,23 @@ import {
   Move,
   Keyboard,
   Send,
+  LoaderCircle,
 } from "lucide-react";
 
 const STARTUP_MODEL_URL = "/api/models/nova.compressed.glb";
 
 interface AvatarCanvasProps {
   isSpeaking: boolean;
+  isListening?: boolean;
   audioLevel?: number;
   onSpeakGreeting?: () => void;
   onQuickAction?: (action: "todo" | "important" | "inspect") => void;
   onToggleListening?: () => void;
   onCaptureScreen?: () => void;
   onSendMessage?: (text: string) => void;
+  status?: string;
+  voiceNotice?: string | null;
+  connectionProgress?: number | null;
   onToggleFullView?: () => void;
   modelOnly?: boolean;
   className?: string;
@@ -51,12 +56,16 @@ interface AvatarCanvasProps {
 
 export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   isSpeaking,
+  isListening = false,
   audioLevel = 0,
   onSpeakGreeting,
   onQuickAction,
   onToggleListening,
   onCaptureScreen,
   onSendMessage,
+  status = "idle",
+  voiceNotice = null,
+  connectionProgress = null,
   onToggleFullView,
   modelOnly = false,
   className = "",
@@ -602,6 +611,29 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       <div ref={containerRef} className="relative flex-1 w-full h-full cursor-grab active:cursor-grabbing" />
 
       {modelOnly && (
+        <div className="absolute top-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-cyan-200/20 bg-slate-950/70 px-3 py-1.5 text-[10px] font-semibold tracking-wide text-slate-200 shadow-[0_8px_30px_rgba(8,145,178,0.18)] backdrop-blur-xl">
+          {(status === "processing" || status === "executing") && <LoaderCircle className="h-3 w-3 animate-spin text-cyan-300" />}
+          {status === "listening" && <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />}
+          {status === "speaking" && <Volume2 className="h-3 w-3 text-pink-300" />}
+          <span>{status === "processing" ? "Thinking..." : status === "executing" ? "Working..." : status === "listening" ? "Listening" : status === "speaking" ? "Speaking" : "Ready"}</span>
+        </div>
+      )}
+
+      {modelOnly && connectionProgress !== null && (
+        <div className="absolute left-1/2 top-[11%] z-40 w-44 -translate-x-1/2 rounded-full border border-cyan-200/20 bg-slate-950/65 p-1 shadow-[0_8px_30px_rgba(8,145,178,0.16)] backdrop-blur-xl">
+          <div className="h-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-sky-400 to-indigo-500 shadow-[0_0_12px_rgba(56,189,248,0.85)] transition-[width] duration-300"
+              style={{ width: `${connectionProgress}%` }}
+            />
+          </div>
+          <div className="mt-1 text-center text-[9px] font-medium tracking-[0.16em] text-cyan-100/70">
+            CONNECTING TO AI {connectionProgress}%
+          </div>
+        </div>
+      )}
+
+      {modelOnly && (
         <div className={`absolute top-[20%] left-1/2 z-40 w-[min(360px,calc(100%-24px))] -translate-x-1/2 pointer-events-auto transition ${showModelInput ? "opacity-100" : "pointer-events-none opacity-0"}`}>
           <form
             onSubmit={(event) => {
@@ -632,58 +664,72 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       )}
 
       {modelOnly && (
-        <div className="absolute inset-x-0 top-[27%] flex items-center justify-center gap-2 pointer-events-none z-40">
+        <div className="absolute bottom-4 left-4 z-40 w-[min(330px,calc(100%-32px))] pointer-events-none">
+          {voiceNotice && (
+            <div className="mb-2 rounded-xl border border-rose-300/30 bg-rose-950/85 px-3 py-2 text-center text-[10px] font-medium text-rose-100 shadow-lg backdrop-blur-xl">
+              {voiceNotice}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/15 bg-slate-950/75 p-2 shadow-[0_16px_50px_rgba(2,6,23,0.55)] backdrop-blur-2xl">
           <button
             onClick={onSpeakGreeting}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-pink-200/60 bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 text-white shadow-lg shadow-pink-950/40 backdrop-blur-xl transition hover:brightness-125"
+            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-cyan-200/25 bg-gradient-to-br from-cyan-400/90 via-sky-500/90 to-indigo-600/95 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(14,165,233,0.24)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Talk to Magic"
           >
             <Volume2 className="h-4 w-4" />
+            <span>Talk</span>
           </button>
           <button
             onClick={onToggleListening}
-            className={`pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-xl transition hover:brightness-125 ${
-              isSpeaking ? "border-lime-200/70 bg-gradient-to-br from-lime-400 via-emerald-500 to-cyan-500 text-white" : "border-cyan-200/60 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white"
+            className={`pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border text-[10px] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:brightness-125 ${
+              isListening ? "border-emerald-200/50 bg-gradient-to-br from-emerald-400/90 via-cyan-500/90 to-sky-600 text-white" : "border-sky-200/25 bg-gradient-to-br from-slate-700 via-sky-600 to-indigo-700 text-white"
             }`}
             title="Toggle microphone"
           >
             <Mic className="h-4 w-4" />
+            <span>{isListening ? "Live" : "Mic"}</span>
           </button>
           <button
             onClick={onCaptureScreen}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-violet-200/60 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500 text-white shadow-lg shadow-violet-950/40 backdrop-blur-xl transition hover:brightness-125"
+            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-indigo-200/25 bg-gradient-to-br from-indigo-500/90 via-violet-600/90 to-slate-800 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(99,102,241,0.24)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Scan desktop screen"
           >
             <Eye className="h-4 w-4" />
+            <span>Scan</span>
           </button>
           <button
             onClick={() => setShowModelInput((current) => !current)}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-blue-200/60 bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-white shadow-lg transition hover:brightness-125"
+            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-blue-200/30 bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-[10px] font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-125"
             title="Type a message to Magic"
           >
             <Keyboard className="h-4 w-4" />
+            <span>Type</span>
           </button>
           <button
             onClick={() => onQuickAction?.("todo")}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-cyan-200/60 bg-gradient-to-br from-cyan-400 via-teal-500 to-emerald-500 text-white shadow-lg shadow-cyan-950/30 backdrop-blur-xl transition hover:brightness-125"
+            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-cyan-200/25 bg-gradient-to-br from-sky-500/90 via-cyan-600/90 to-slate-800 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(6,182,212,0.22)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Ask Magic to manage your to-do list"
           >
             <ListTodo className="h-3.5 w-3.5" />
+            <span>To-do</span>
           </button>
           <button
             onClick={() => onQuickAction?.("important")}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-amber-100/70 bg-gradient-to-br from-yellow-300 via-amber-500 to-red-500 text-white shadow-lg shadow-amber-950/30 backdrop-blur-xl transition hover:brightness-125"
+            className="pointer-events-auto flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-200/30 bg-gradient-to-br from-amber-300/90 via-orange-500/90 to-slate-800 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(245,158,11,0.22)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Ask Magic to surface important items"
           >
             <Star className="h-3.5 w-3.5" />
+            <span>Key</span>
           </button>
           <button
             onClick={onToggleFullView}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-slate-100 via-slate-400 to-slate-700 text-slate-950 shadow-lg backdrop-blur-xl transition hover:brightness-125"
+            className="pointer-events-auto col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-gradient-to-br from-slate-200/90 via-slate-500 to-slate-900 text-[10px] font-semibold text-slate-950 shadow-[0_8px_22px_rgba(148,163,184,0.2)] transition hover:-translate-y-0.5 hover:brightness-125"
             title="Open the full assistant"
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
+            <span>Full Assistant</span>
           </button>
+          </div>
         </div>
       )}
 
@@ -1063,4 +1109,3 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     </div>
   );
 };
-

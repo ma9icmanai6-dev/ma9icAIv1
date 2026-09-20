@@ -47,10 +47,23 @@ function normalizeDesktopIntent(message: string, parsed: any) {
     [/\b(file explorer|explorer|files)\b/, "explorer"],
     [/\b(task manager|taskmgr)\b/, "taskmgr"],
     [/\b(power ?shell|terminal)\b/, "terminal"],
+    [/\b(firefox|mozilla firefox)\b/, "firefox"],
   ];
   const requestedApp = appAliases.find(([pattern]) => pattern.test(request))?.[1];
   const asksToOpen = /\b(open|launch|start|load|run)\b/.test(request);
+  const fileMatch = message.match(/\b(?:open|load)\s+(?:the\s+)?file\s+["']?(.+?)["']?\s*$/i);
 
+  if (fileMatch && parsed?.action?.type !== "OPEN_FILE") {
+    return {
+      ...parsed,
+      action: {
+        type: "OPEN_FILE",
+        description: `Open ${fileMatch[1]}`,
+        path: fileMatch[1].trim(),
+        parameter: fileMatch[1].trim(),
+      },
+    };
+  }
   if (requestedApp && asksToOpen && parsed?.action?.type !== "LAUNCH_APP" && parsed?.action?.type !== "MULTI_STEP_PLAN") {
     return {
       ...parsed,
@@ -276,7 +289,7 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const systemPrompt = `You are "Magic", a sophisticated, friendly, articulate, highly capable AI desktop assistant.
+    const systemPrompt = `You are "Magic", a sophisticated, friendly, articulate, highly capable AI desktop assistant inside the Magic AI app.
 Persona: Composed, attentive, clear, proactive, and elegant.
 Voice response style: Concise, spoken-friendly, conversational, direct (under 40 words).
 
@@ -288,7 +301,8 @@ When responding, you must provide:
 Possible action types:
 - "WEB_SEARCH": { "query": string }
 - "SCREEN_ANALYSIS": {}
-- "LAUNCH_APP": { "app": "brave" | "edge" | "chrome" | "notepad" | "calculator" | "paint" | "explorer" | "terminal" | "taskmgr" }
+- "LAUNCH_APP": { "app": "brave" | "edge" | "chrome" | "firefox" | "notepad" | "calculator" | "paint" | "explorer" | "terminal" | "taskmgr" }
+- "OPEN_FILE": { "path": string }
 - "REMEMBER": { "key": string, "value": string, "category": string }
 - "FORGET": { "key": string }
 - "MULTI_STEP_PLAN": { "planTitle": string, "spokenIntro": string, "steps": Array<{ "stepNumber": number, "description": string, "actionType": "LAUNCH_APP" | "MOVE_MOUSE" | "CLICK_BUTTON" | "TYPE_INPUT" | "KEY_PRESS" | "WAIT", "params": { "app"?: string, "x"?: number, "y"?: number, "text"?: string, "key"?: string, "ms"?: number } }>, "spokenCompletion": string }
@@ -570,7 +584,7 @@ app.post("/api/agent/plan", async (req, res) => {
       return res.status(400).json({ error: "Goal is required" });
     }
 
-    const plannerPrompt = `You are the Task Planning Engine for Magic Windows Assistant.
+    const plannerPrompt = `You are the Task Planning Engine for Magic inside the Magic Windows Assistant.
 Deconstruct the user's high-level command into an ordered sequence of executable automation steps.
 User Goal: "${goal}"
 Desktop Context: ${JSON.stringify(context)}

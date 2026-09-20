@@ -49,7 +49,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-100">Welcome to Magic AI</h2>
+          <h2 className="text-lg font-semibold text-slate-100">Welcome to Magic</h2>
           <p className="text-xs text-slate-400 mt-1">
             Your personal multimodal voice companion. Speak naturally, ask me to examine your screen, or plan multi-step workflows.
           </p>

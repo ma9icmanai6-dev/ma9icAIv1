@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   AssistantState,
   ChatMessage,
@@ -66,6 +66,9 @@ export default function App() {
   const [visionThumbnail, setVisionThumbnail] = useState<string | undefined>(undefined);
   const [isAnalyzingVision, setIsAnalyzingVision] = useState(false);
   const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
+  const [connectionProgress, setConnectionProgress] = useState<number | null>(null);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const lastGreetingRef = useRef(-1);
 
   useEffect(() => {
     document.body.classList.toggle("desktop-shell", isDesktopShell);
@@ -75,6 +78,19 @@ export default function App() {
   useEffect(() => {
     (window as any).magicWindow?.setOverlayMode(experienceMode === "model");
   }, [experienceMode]);
+
+  useEffect(() => {
+    if (assistantState !== "processing" && assistantState !== "executing") {
+      setConnectionProgress(null);
+      return;
+    }
+
+    setConnectionProgress(12);
+    const timer = window.setInterval(() => {
+      setConnectionProgress((current) => current === null ? 12 : Math.min(88, current + 7));
+    }, 450);
+    return () => window.clearInterval(timer);
+  }, [assistantState]);
 
   // Voice Settings & Modal
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(VoiceEngine.getSettings());
@@ -95,6 +111,7 @@ export default function App() {
       TYPE_INPUT: { action: "TYPE_TEXT", params: { text: params.text || params.parameter || "" } },
       KEY_PRESS: { action: "KEY_PRESS", params: { key: params.key || params.key_combination || params.parameter || "" } },
       LAUNCH_APP: { action: "LAUNCH_APP", params: { app: params.app || params.parameter || "notepad.exe" } },
+      OPEN_FILE: { action: "OPEN_FILE", params: { path: params.path || params.parameter || "" } },
       WAIT: { action: "WAIT", params: { ms: params.ms || params.estimatedDurationMs || 500 } },
     };
     const mapped = actions[normalizedType];
@@ -153,7 +170,8 @@ export default function App() {
             estimatedDurationMs: plan.steps[i].estimatedDurationMs,
           });
         } catch (error) {
-          const reason = describeError(error, "The desktop action did not complete.");
+          const rawReason = describeError(error, "The desktop action did not complete.");
+          const reason = rawReason.length > 180 ? "Windows rejected the desktop action. Check the target app and permissions." : rawReason;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.action?.multiStepPlan
@@ -315,11 +333,23 @@ export default function App() {
     }
   }, []);
 
-  // Trigger Magic Greeting ("Hi, how can I help you?") when user says "Magic" or clicks the orb
+  // Trigger Magic's greeting when the user says "Magic" or clicks the orb
   const triggerMagicGreeting = useCallback(() => {
     VoiceEngine.stopSpeaking();
 
-    const greetingText = "Hi, how can I help you?";
+    const greetings = [
+      "Hi there. What can I help you with today?",
+      "Good to see you. I am ready when you are.",
+      "Hello. Your desktop assistant is online.",
+      "Welcome back. What would you like to do?",
+      "Hi. I am here and listening when you need me.",
+    ];
+    let greetingIndex = Math.floor(Math.random() * greetings.length);
+    if (greetings.length > 1 && greetingIndex === lastGreetingRef.current) {
+      greetingIndex = (greetingIndex + 1) % greetings.length;
+    }
+    lastGreetingRef.current = greetingIndex;
+    const greetingText = greetings[greetingIndex];
 
     setMessages((prev) => [
       ...prev,
@@ -336,9 +366,17 @@ export default function App() {
 
     VoiceEngine.speak(greetingText, () => {
       // Once speaking finishes, immediately start listening for user's input
-      VoiceEngine.startListening();
-      setIsListening(true);
-      setAssistantState("listening");
+      VoiceEngine.startListening()
+        .then(() => {
+          setVoiceNotice(null);
+          setIsListening(true);
+          setAssistantState("listening");
+        })
+        .catch((error) => {
+          setIsListening(false);
+          setAssistantState("idle");
+          setVoiceNotice(describeError(error, "Microphone access is unavailable."));
+        });
     });
   }, []);
 
@@ -347,7 +385,7 @@ export default function App() {
     async (text: string) => {
       if (!text.trim()) return;
 
-      // If user says/types purely "magic" or "hey magic", trigger greeting
+      // If user says/types purely "Magic" or "Hey Magic", trigger greeting
       const isPureWakeWord = /^\s*(hey\s+|hi\s+|ok\s+|okay\s+)?magic[!?.,]*\s*$/i.test(text.trim());
       if (isPureWakeWord) {
         triggerMagicGreeting();
@@ -406,22 +444,26 @@ export default function App() {
           setAssistantState("idle");
         });
 
-        // Handle specific actions if present
-        if (data.action?.type === "LAUNCH_APP") {
+          // Handle specific actions if present
+          if (data.action?.type === "LAUNCH_APP" || data.action?.type === "OPEN_FILE") {
           const appName = data.action.app || data.action.parameter || data.action.params?.app;
-          const plan: MultiStepPlan = {
-            id: `launch-${Date.now()}`,
-            planTitle: `Open ${appName || "application"}`,
-            spokenIntro: spokenText,
-            steps: [{
-              stepNumber: 1,
-              description: `Launch ${appName || "application"}`,
-              actionType: "LAUNCH_APP",
-              params: { app: appName },
+            const filePath = data.action.path || data.action.parameter || data.action.params?.path;
+            const actionType = data.action.type;
+            const plan: MultiStepPlan = {
+              id: `launch-${Date.now()}`,
+              planTitle: actionType === "OPEN_FILE" ? `Open ${filePath || "file"}` : `Open ${appName || "application"}`,
+              spokenIntro: spokenText,
+              steps: [{
+                stepNumber: 1,
+                description: actionType === "OPEN_FILE" ? `Open ${filePath || "file"}` : `Launch ${appName || "application"}`,
+                actionType,
+                params: actionType === "OPEN_FILE" ? { path: filePath } : { app: appName },
               status: "pending",
               estimatedDurationMs: 1000,
             }],
-            spokenCompletion: `${appName || "The application"} is open.`,
+            spokenCompletion: actionType === "OPEN_FILE"
+              ? `${filePath || "The file"} is open.`
+              : `${appName || "The application"} is open.`,
             currentStepIndex: 0,
             status: "idle",
           };
@@ -481,12 +523,12 @@ export default function App() {
     } else {
       setIsListening(true);
       setAssistantState("listening");
+      setVoiceNotice(null);
       VoiceEngine.startListening().catch((error) => {
         setIsListening(false);
         setAssistantState("error");
-        VoiceEngine.speak(`Microphone unavailable: ${describeError(error, "check microphone permissions and Windows speech recognition.")}`, () => {
-          setAssistantState("idle");
-        });
+        setVoiceNotice(describeError(error, "Microphone access is unavailable."));
+        setAssistantState("idle");
       });
     }
   }, [isListening]);
@@ -571,7 +613,9 @@ export default function App() {
     const unsubVoiceError = VoiceEngine.onError((message: string) => {
       setIsListening(false);
       setAssistantState("error");
-      VoiceEngine.speak(message, () => setAssistantState("idle"));
+      console.warn("Voice recognition stopped:", message);
+      setVoiceNotice(message);
+      setAssistantState("idle");
     });
 
     return () => {
@@ -583,6 +627,11 @@ export default function App() {
       VoiceEngine.stopListening();
     };
   }, [handleSendMessage, triggerMagicGreeting]);
+
+  useEffect(() => {
+    const greetingTimer = window.setTimeout(() => triggerMagicGreeting(), 900);
+    return () => window.clearTimeout(greetingTimer);
+  }, [triggerMagicGreeting]);
 
   return (
     <div
@@ -596,12 +645,16 @@ export default function App() {
       {experienceMode === "model" ? (
         <AvatarCanvas
           isSpeaking={assistantState === "speaking"}
+          isListening={isListening}
           audioLevel={audioLevel}
           modelOnly
           onSpeakGreeting={triggerMagicGreeting}
           onToggleListening={handleToggleListening}
           onCaptureScreen={handleCaptureScreen}
           onSendMessage={handleSendMessage}
+          status={assistantState}
+          voiceNotice={voiceNotice}
+          connectionProgress={connectionProgress}
           onQuickAction={handleModelQuickAction}
           onToggleFullView={() => setExperienceMode("full")}
           className="h-screen w-screen"

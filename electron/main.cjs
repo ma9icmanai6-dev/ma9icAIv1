@@ -1,5 +1,6 @@
-const {app, BrowserWindow, ipcMain, screen, desktopCapturer, session, globalShortcut} = require("electron");
-const {execFile} = require("child_process");
+const {app, BrowserWindow, ipcMain, screen, desktopCapturer, session, globalShortcut, shell} = require("electron");
+const {execFile, spawn} = require("child_process");
+const fs = require("fs");
 const path = require("path");
 const http = require("http");
 
@@ -28,6 +29,7 @@ async function executeDesktopAction(action, params = {}) {
       brave: ["brave.exe", `${process.env.LOCALAPPDATA}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`, `${process.env.ProgramFiles}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`, `${process.env["ProgramFiles(x86)"]}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`],
       edge: ["msedge.exe", `${process.env["ProgramFiles(x86)"]}\\Microsoft\\Edge\\Application\\msedge.exe`],
       chrome: ["chrome.exe", `${process.env.ProgramFiles}\\Google\\Chrome\\Application\\chrome.exe`],
+      firefox: ["firefox.exe", `${process.env.ProgramFiles}\\Mozilla Firefox\\firefox.exe`, `${process.env["ProgramFiles(x86)"]}\\Mozilla Firefox\\firefox.exe`],
       notepad: ["notepad.exe"],
       calculator: ["calc.exe"],
       paint: ["mspaint.exe"],
@@ -39,13 +41,22 @@ async function executeDesktopAction(action, params = {}) {
     };
     const requested = String(params.app || "").trim().toLowerCase();
     const candidates = aliases[requested] || [String(params.app || "")];
-    const launchScript = `
-$candidates = ConvertFrom-Json $args[0]
-$target = $candidates | Where-Object { $_ -and ((Test-Path $_) -or $_ -match '\\.exe$') } | Select-Object -First 1
-if (-not $target) { throw "Could not find application: $($candidates -join ', ')" }
-Start-Process -FilePath $target
-`;
-    await runPowerShell(launchScript, [JSON.stringify(candidates)]);
+    const target = candidates.find((candidate) => candidate && fs.existsSync(candidate)) || candidates.find((candidate) => /\.exe$/i.test(candidate));
+    if (!target) throw new Error(`Could not find application: ${requested || "requested app"}.`);
+    const child = spawn(target, [], { detached: true, stdio: "ignore", windowsHide: true });
+    await new Promise((resolve, reject) => {
+      child.once("error", (error) => reject(new Error(`Windows could not launch ${requested || target}: ${error.message}`)));
+      child.once("spawn", resolve);
+    });
+    child.unref();
+    if (desktopPermission === "one_action") desktopPermission = "none";
+    return;
+  }
+  if (action === "OPEN_FILE") {
+    const filePath = String(params.path || "").trim();
+    if (!filePath) throw new Error("No file path was provided.");
+    const errorMessage = await shell.openPath(path.resolve(filePath));
+    if (errorMessage) throw new Error(`Could not open file: ${errorMessage}`);
     if (desktopPermission === "one_action") desktopPermission = "none";
     return;
   }

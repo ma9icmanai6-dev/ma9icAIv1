@@ -269,6 +269,10 @@ export class VoiceEngine {
             : `Speech recognition error: ${event.error}`;
           this.callbacks.onError(message);
           VoiceEngine.errorListeners.forEach((listener) => listener(message));
+          if (["not-allowed", "service-not-allowed", "network", "audio-capture"].includes(event.error)) {
+            this.isListening = false;
+            this.stopListening();
+          }
         }
       };
 
@@ -388,6 +392,7 @@ export class VoiceEngine {
 
       // Cancel any ongoing speech
       this.synth.cancel();
+      this.synth.resume();
 
       // Clean markdown tags or symbols from spoken voice
       const cleanText = text
@@ -437,6 +442,12 @@ export class VoiceEngine {
       };
 
       this.synth.speak(utterance);
+      // Chromium can leave synthesis paused after a previous cancelled utterance.
+      window.setTimeout(() => {
+        if (this.currentUtterance === utterance && this.synth?.paused) {
+          this.synth.resume();
+        }
+      }, 100);
     });
   }
 

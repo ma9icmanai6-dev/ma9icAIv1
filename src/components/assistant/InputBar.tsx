@@ -119,7 +119,7 @@ export const InputBar: React.FC<InputBarProps> = ({
               ? "bg-cyan-500 text-slate-950 ring-4 ring-cyan-500/30 scale-105"
               : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
           }`}
-          title={isListening ? "Stop listening" : "Start voice listening (or say 'Magic')"}
+          title={isListening ? "Stop listening" : "Start voice listening (or say 'Hey Magic')"}
         >
           {isListening ? (
             <Mic className="w-5 h-5 animate-pulse" />
