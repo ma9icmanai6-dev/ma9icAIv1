@@ -20,6 +20,7 @@ import { VoiceSettingsModal } from "./components/assistant/VoiceSettingsModal";
 import { MemoryModal } from "./components/assistant/MemoryModal";
 import { VisionModal } from "./components/assistant/VisionModal";
 import { SuperAIPermissionDialog } from "./components/desktop/SuperAIPermissionDialog";
+import { TakeControlModal } from "./components/desktop/TakeControlModal";
 
 import {
   Sparkles,
@@ -33,6 +34,7 @@ import {
   User,
   Radio,
   X,
+  MousePointer,
 } from "lucide-react";
 
 function describeError(error: unknown, fallback: string): string {
@@ -53,6 +55,7 @@ export default function App() {
   const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>("none");
   const [pendingPlan, setPendingPlan] = useState<MultiStepPlan | null>(null);
   const [isPermissionOpen, setIsPermissionOpen] = useState(false);
+  const [isTakeControlOpen, setIsTakeControlOpen] = useState(false);
 
   // Chat conversation
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -718,6 +721,15 @@ export default function App() {
             <span className="hidden sm:inline">Inspect Screen</span>
           </button>
 
+          <button
+            onClick={() => setIsTakeControlOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/35 bg-amber-400/15 px-3 py-1.5 text-xs text-amber-200 transition-colors hover:border-amber-300/60 hover:bg-amber-400/25"
+            title="Tell Magic to control the desktop"
+          >
+            <MousePointer className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Take Control</span>
+          </button>
+
           {/* Camera Button */}
           <button
             onClick={handleCaptureCamera}
@@ -903,6 +915,14 @@ export default function App() {
         requestedActionDescription={pendingPlan?.planTitle || "A multi-step desktop control task"}
         onGrant={handlePermissionGrant}
         onDeny={handlePermissionDeny}
+      />
+      <TakeControlModal
+        isOpen={isTakeControlOpen}
+        onClose={() => setIsTakeControlOpen(false)}
+        onSubmit={(task) => {
+          setIsTakeControlOpen(false);
+          handleSendMessage(task);
+        }}
       />
         </>
       )}
