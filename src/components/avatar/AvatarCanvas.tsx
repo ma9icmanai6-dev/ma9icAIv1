@@ -53,6 +53,7 @@ interface AvatarCanvasProps {
   onToggleFullView?: () => void;
   visualMode?: "avatar" | "orb";
   onVisualModeChange?: (mode: "avatar" | "orb") => void;
+  onModelConnectionChange?: (connected: boolean) => void;
   loadOnMount?: boolean;
   modelOnly?: boolean;
   className?: string;
@@ -73,6 +74,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   onToggleFullView,
   visualMode = "avatar",
   onVisualModeChange,
+  onModelConnectionChange,
   modelOnly = false,
   loadOnMount = modelOnly,
   className = "",
@@ -124,6 +126,10 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const [morphTargetNames, setMorphTargetNames] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [modelConnected, setModelConnected] = useState<boolean>(false);
+  const updateModelConnection = useCallback((connected: boolean) => {
+    setModelConnected(connected);
+    onModelConnectionChange?.(connected);
+  }, [onModelConnectionChange]);
   const [loadProgress, setLoadProgress] = useState<number | null>(null);
   const [showInspector, setShowInspector] = useState<boolean>(false);
   const [manualWeights, setManualWeights] = useState<Record<string, number>>({});
@@ -199,9 +205,9 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     setIsCustomModel(false);
     setMorphTargetNames(defaultAvatar.morphNames);
     setStatusMessage("Loaded procedural head with ARKit 52 morphs");
-    setModelConnected(true);
+    updateModelConnection(true);
     setShowModelMenu(false);
-  }, []);
+  }, [updateModelConnection]);
 
   /**
    * Load model from URL path (.glb, .gltf)
@@ -211,7 +217,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     if (!targetScene) return;
 
     setIsLoading(true);
-    setModelConnected(false);
+    updateModelConnection(false);
     setLoadProgress(null);
     const fileName = url.split("/").pop() || "3D Model";
     setStatusMessage(`Loading 3D model: ${fileName}...`);
@@ -241,10 +247,10 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       setIsCustomModel(true);
       setMorphTargetNames(loadedAvatar.morphNames);
       setStatusMessage(`Loaded ${displayName} (${loadedAvatar.morphNames.length} blendshapes active)`);
-      setModelConnected(true);
+      updateModelConnection(true);
     } catch (err: any) {
       console.warn(`Failed to load 3D model from ${url}:`, err);
-      setModelConnected(false);
+      updateModelConnection(false);
       setStatusMessage(`Failed to load ${fileName}: ${err.message || "Parse error"}. Falling back to procedural rig.`);
       loadDefaultHead(targetScene);
     } finally {
@@ -252,7 +258,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       setLoadProgress(null);
       setShowModelMenu(false);
     }
-  }, [frameAvatar, loadDefaultHead]);
+  }, [frameAvatar, loadDefaultHead, updateModelConnection]);
 
   /**
    * Load custom user 3D model (.glb, .gltf, .vrm, .obj - e.g. Reallusion CC4, ReadyPlayerMe, Blender)
@@ -260,7 +266,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   const loadCustomModelFile = useCallback(async (file: File) => {
     if (!sceneRef.current) return;
     setIsLoading(true);
-    setModelConnected(false);
+    updateModelConnection(false);
     setLoadProgress(null);
     setStatusMessage(`Parsing 3D mesh and morph targets from ${file.name}...`);
 
@@ -288,20 +294,20 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       setStatusMessage(
         `Loaded ${file.name} (${loadedAvatar.morphNames.length} morph targets detected)`
       );
-      setModelConnected(true);
+      updateModelConnection(true);
       frameAvatar(loadedAvatar.root, modelOnlyRef.current);
     } catch (err: any) {
       console.error("Error parsing 3D file:", err);
       setStatusMessage(
         `Failed to parse 3D file: ${err.message || "Invalid or unsupported file format"}`
       );
-      setModelConnected(false);
+      updateModelConnection(false);
     } finally {
       setIsLoading(false);
       setLoadProgress(null);
       setShowModelMenu(false);
     }
-  }, []);
+  }, [frameAvatar, updateModelConnection]);
 
   /**
    * Initialize Three.js Scene, Camera, Lighting, Controls

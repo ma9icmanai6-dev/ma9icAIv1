@@ -50,6 +50,7 @@ export default function App() {
   const [visualMode, setVisualMode] = useState<"avatar" | "orb">("avatar");
   const [experienceMode, setExperienceMode] = useState<"full" | "model">("full");
   const [showVisualStage, setShowVisualStage] = useState(false);
+  const [modelConnected, setModelConnected] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(true);
   const [activityText, setActivityText] = useState("");
   const [guiBlurred, setGuiBlurred] = useState(true);
@@ -704,6 +705,7 @@ export default function App() {
           connectionProgress={connectionProgress}
           onQuickAction={handleModelQuickAction}
           onToggleFullView={() => setExperienceMode("full")}
+          onModelConnectionChange={setModelConnected}
           loadOnMount
           className="h-screen w-screen"
         />
@@ -738,6 +740,18 @@ export default function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 pr-12 sm:gap-2">
+          <div
+            className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-medium ${
+              modelConnected
+                ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
+                : "border-rose-400/30 bg-rose-500/10 text-rose-300"
+            }`}
+            title={modelConnected ? "3D model connected" : "3D model not connected"}
+          >
+            <span className={`h-2 w-2 rounded-full ${modelConnected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-rose-500 shadow-[0_0_8px_#f43f5e]"}`} />
+            <span className="hidden sm:inline">{modelConnected ? "Model connected" : "Model not connected"}</span>
+          </div>
+
           {/* Model-only overlay mode */}
           <button
             onClick={() => setExperienceMode("model")}
@@ -813,6 +827,7 @@ export default function App() {
               onSpeakGreeting={triggerMagicGreeting}
               visualMode={visualMode}
               onVisualModeChange={setVisualMode}
+              onModelConnectionChange={setModelConnected}
               loadOnMount
               className="h-44 sm:h-52 w-full"
             />
