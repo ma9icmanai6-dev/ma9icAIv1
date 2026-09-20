@@ -62,6 +62,10 @@ export default function App() {
   const [pendingPlan, setPendingPlan] = useState<MultiStepPlan | null>(null);
   const [isPermissionOpen, setIsPermissionOpen] = useState(false);
   const [isTakeControlOpen, setIsTakeControlOpen] = useState(false);
+  const [takeControlTask, setTakeControlTask] = useState("");
+  const [isTakeControlListening, setIsTakeControlListening] = useState(false);
+  const takeControlOpenRef = useRef(false);
+  const stopExecutionRef = useRef(false);
 
   // Chat conversation
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -143,6 +147,10 @@ export default function App() {
     VoiceEngine.setAssistantName(assistantName);
   }, [assistantName]);
 
+  useEffect(() => {
+    takeControlOpenRef.current = isTakeControlOpen;
+  }, [isTakeControlOpen]);
+
   const setDesktopPermission = useCallback((level: PermissionLevel) => {
     setPermissionLevel(level);
     (window as any).magicDesktop?.setPermission(level);
@@ -203,10 +211,17 @@ export default function App() {
   // Execute multi-step task sequence locally if suggested
   const executePlanSequence = useCallback(
     async (plan: MultiStepPlan) => {
+      stopExecutionRef.current = false;
       setAssistantState("executing");
       setShowActivityPanel(true);
 
       for (let i = 0; i < plan.steps.length; i++) {
+        if (stopExecutionRef.current) {
+          setAssistantState("idle");
+          setActivityText("");
+          setShowActivityPanel(false);
+          return;
+        }
         setActivityText(plan.steps[i].description || `Running step ${i + 1}`);
         // Update plan progress
         setMessages((prev) =>
@@ -588,6 +603,9 @@ export default function App() {
 
   const handleTakeControl = useCallback(async (task: string) => {
     setIsTakeControlOpen(false);
+    setIsTakeControlListening(false);
+    VoiceEngine.stopListening();
+    setTakeControlTask("");
     const screenContext = await handleCaptureScreen();
     await handleSendMessage(task, screenContext);
   }, [handleCaptureScreen, handleSendMessage]);
@@ -617,6 +635,33 @@ export default function App() {
       });
     }
   }, [isListening]);
+
+  const handleTakeControlVoice = useCallback(() => {
+    if (isTakeControlListening) {
+      VoiceEngine.stopListening();
+      setIsTakeControlListening(false);
+      return;
+    }
+    VoiceEngine.startListening()
+      .then(() => {
+        setIsTakeControlListening(true);
+        setVoiceNotice(null);
+      })
+      .catch((error) => {
+        setIsTakeControlListening(false);
+        setVoiceNotice(describeError(error, "Microphone access is unavailable."));
+      });
+  }, [isTakeControlListening]);
+
+  const handleStopDesktopControl = useCallback(() => {
+    stopExecutionRef.current = true;
+    (window as any).magicDesktop?.emergencyStop?.();
+    setDesktopPermission("deny");
+    setAssistantState("idle");
+    setActivityText("");
+    setShowActivityPanel(false);
+    VoiceEngine.speak("Desktop control stopped.");
+  }, [setDesktopPermission]);
 
   const handleModelQuickAction = useCallback(
     (action: "todo" | "important" | "inspect") => {
@@ -686,6 +731,12 @@ export default function App() {
 
     // 3. Connect speech recognition callback
     const unsubSpeech = VoiceEngine.onSpeechRecognized((transcript: string) => {
+      if (takeControlOpenRef.current) {
+        setTakeControlTask((current) => `${current ? `${current} ` : ""}${transcript}`.trim());
+        setIsTakeControlListening(false);
+        VoiceEngine.stopListening();
+        return;
+      }
       setAssistantState("processing");
       handleSendMessage(transcript);
     });
@@ -924,11 +975,11 @@ export default function App() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowActivityPanel(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
-                title="Hide activity panel"
+                onClick={handleStopDesktopControl}
+                className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-[10px] font-semibold text-rose-200 hover:bg-rose-500/25"
+                title="Stop desktop control"
               >
-                <X className="h-4 w-4" />
+                Stop
               </button>
             </div>
           </div>
@@ -1030,9 +1081,18 @@ export default function App() {
       />
       <TakeControlModal
         isOpen={isTakeControlOpen}
-        onClose={() => setIsTakeControlOpen(false)}
+        onClose={() => {
+          setIsTakeControlOpen(false);
+          setIsTakeControlListening(false);
+          VoiceEngine.stopListening();
+          setTakeControlTask("");
+        }}
         onSubmit={handleTakeControl}
         assistantName={assistantName}
+        task={takeControlTask}
+        onTaskChange={setTakeControlTask}
+        isListening={isTakeControlListening}
+        onToggleListening={handleTakeControlVoice}
       />
     </div>
   );
